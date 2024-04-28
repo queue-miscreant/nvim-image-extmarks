@@ -1,0 +1,34 @@
+*pluginname.txt*					Plugin blurb
+
+================================================================================
+INTRODUCTION                                            *plugin-introduction*
+
+Plugin description
+
+--------------------------------------------------------------------------------
+COMMANDS                                                *plugin-command*
+
+Plugin commands
+
+--------------------------------------------------------------------------------
+KEYS                                                    *plugin-keys*
+
+Plugin keybinds
+
+--------------------------------------------------------------------------------
+FUNCTIONS                                               *plugin-function*
+
+Exposed functions
+
+--------------------------------------------------------------------------------
+CONFIGURATION                                           *plugin-configuration*
+
+Global variables
+
+--------------------------------------------------------------------------------
+HIGHLIGHTS                                              *plugin-highlights*
+
+Plugin highlights
+
+================================================================================
+vim:tw=80:nosta:ft=help:fen:
