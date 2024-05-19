@@ -31,6 +31,14 @@ function char_pixel_height()
   return 28
 end
 
+function get_drawing_params()
+  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())[1]
+  local start_column = wininfo.textoff
+  local topline = wininfo.topline
+
+  return {start_column, topline, char_pixel_height()}
+end
+
 function draw_sixel(blob, winpos)
   if tty == nil then
     return
@@ -42,6 +50,16 @@ function draw_sixel(blob, winpos)
     stdout:write("\x1b[u")
     stdout:close()
   end)
+end
+
+function clear_screen()
+  -- clear screen with :mode
+  vim.cmd("mode")
+  -- clear tmux with tmux detach -E "tmux attach -t (session number)"
+  local _, _, _, tmux_pid, tmux_session = tostring(vim.env.TMUX):find("(.+),(%d+),(%d+)")
+  if tmux_session ~= nil then
+    vim.fn.system(("tmux detach -E 'tmux attach -t %s'"):format(tonumber(tmux_session)))
+  end
 end
 
 pcall(get_tty)

@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from wand.image import Image
+import subprocess
+import sys
 
 from typing import Optional, Tuple
+
+from wand.image import Image
 
 @dataclass
 class CropDims:
