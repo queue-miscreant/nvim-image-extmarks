@@ -5,14 +5,15 @@ from pathlib import Path
 import sys
 import traceback
 
-from typing import DefaultDict, List, Tuple
+from typing import Any, DefaultDict, Dict, List, Tuple
 
 import pynvim
-from pynvim.api import Window
+from pynvim.api import Buffer, Window
 from tmux_image.image import to_sixel, CropDims
+from tmux_image.delimit import process_content, DEFAULT_REGEXES
 
-log = logging.getLogger("vimcord")
-log.setLevel(logging.ERROR)
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 LOGGING_TO_NVIM_LEVELS: DefaultDict[int, int] = defaultdict(lambda: 1, {
     logging.DEBUG: 1,
@@ -30,10 +31,14 @@ class NvimHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         self._nvim.async_call(
             self._nvim.api.notify,
-            record.message,
+            str(record.msg),
             LOGGING_TO_NVIM_LEVELS[record.levelno],
             {},
         )
+
+
+# content cache: id to sixel cache
+# sixel cache: range to blob
 
 
 @pynvim.plugin
@@ -41,6 +46,11 @@ class NvimImage:
     def __init__(self, nvim: pynvim.Nvim):
         self.nvim = nvim
         self._handler = NvimHandler(nvim, level=logging.INFO)
+
+        # self._content_cache: Dict[str, SixelCache] = {}
+
+        # TODO: configurable
+        self._regexes = DEFAULT_REGEXES
 
         nvim.loop.set_exception_handler(self.handle_exception)
         logging.getLogger().addHandler(self._handler)
@@ -68,11 +78,22 @@ class NvimImage:
             )
         )
 
-    # @pynvim.function("FunctionName", sync=True)
-    # def run_function(self, args):
-    #     pass
+    @pynvim.function("VimImageUpdateContent", sync=True)
+    def update_content(self, args: List[str]):
+        buffer: Buffer = self.nvim.current.buffer
+        nodes = process_content(
+            buffer[:],
+            self._regexes,
+        )
+        # TODO: update content cache
 
-    def handle_exception(self, loop, context):
+        # TODO: combine ranges from this (buffer content) and the window view
+
+        # TODO: start processing new sixel content in another thread
+        # use asyncio.Future for running tasks, then update their sixel cache (range to blobs)
+
+
+    def handle_exception(self, _: asyncio.AbstractEventLoop, context: Any) -> None:
         if (exception := context.get("exception")) is None or not isinstance(exception, Exception):
             message = context.get("message")
             log.error("Handler got non-exception: %s", message)
