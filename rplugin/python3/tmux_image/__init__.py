@@ -17,18 +17,24 @@ from tmux_image.latex import ART_PATH
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-LOGGING_TO_NVIM_LEVELS: DefaultDict[int, int] = defaultdict(lambda: 1, {
-    logging.DEBUG: 1,
-    logging.INFO: 1,
-    logging.ERROR: 3,
-    logging.CRITICAL: 4,
-})
+LOGGING_TO_NVIM_LEVELS: DefaultDict[int, int] = defaultdict(
+    lambda: 1,
+    {
+        logging.DEBUG: 1,
+        logging.INFO: 1,
+        logging.ERROR: 3,
+        logging.CRITICAL: 4,
+    },
+)
 
-def crop_to_range(node: Node, column_height_pixels: int, top_line: int, bottom_line: int) -> Optional[Tuple[Node, CropDims]]:
+
+def crop_to_range(
+    node: Node, column_height_pixels: int, top_line: int, bottom_line: int
+) -> Optional[Tuple[Node, CropDims]]:
     crop_top_rows = 0
     crop_bottom_rows = 0
     range_start, range_end = node.range
-    height = (range_end - range_start)*column_height_pixels
+    height = (range_end - range_start) * column_height_pixels
 
     if range_end < top_line or range_start > bottom_line:
         return None
@@ -45,7 +51,10 @@ def crop_to_range(node: Node, column_height_pixels: int, top_line: int, bottom_l
 
     return node, CropDims(
         height=height,
-        top_bottom=(crop_top_rows*column_height_pixels, crop_bottom_rows*column_height_pixels)
+        top_bottom=(
+            crop_top_rows * column_height_pixels,
+            crop_bottom_rows * column_height_pixels,
+        ),
     )
 
 
@@ -65,6 +74,7 @@ class NvimHandler(logging.Handler):
 
 # content cache: id to sixel cache
 # sixel cache: range to blob
+
 
 @dataclass
 class SixelCache:
@@ -89,12 +99,13 @@ class NvimImage:
         nvim.loop.set_exception_handler(self.handle_exception)
         logging.getLogger().addHandler(self._handler)
 
-
     @pynvim.command("OpenImage", nargs=1, range=True, sync=True, complete="file")
     def open_image(self, args: List[str], range: Tuple[int, int]) -> None:
         start, end = range
 
-        drawing_params: Tuple[int | None, int | None, int] = self.nvim.lua.get_drawing_params()
+        drawing_params: Tuple[int | None, int | None, int] = (
+            self.nvim.lua.get_drawing_params()
+        )
         start_column, topline, column_height_pixels = drawing_params
 
         if topline is None or start_column is None:
@@ -108,7 +119,7 @@ class NvimImage:
             self.draw_sixel(
                 Path(args[0]),
                 (row + (start - topline) + 1, col + start_column + 1),
-                (end - start)*column_height_pixels,
+                (end - start) * column_height_pixels,
             )
         )
 
@@ -123,7 +134,9 @@ class NvimImage:
 
         # this must be sync
         # this should get all windows in the current tabpage!
-        drawing_params: Tuple[int | None, int | None, int] = self.nvim.lua.get_drawing_params()
+        drawing_params: Tuple[int | None, int | None, int] = (
+            self.nvim.lua.get_drawing_params()
+        )
         start_column, _, column_height_pixels = drawing_params
         if start_column is None:
             log.critical("Could not get top line of window or starting column!")
@@ -141,7 +154,10 @@ class NvimImage:
         # combine ranges from this (buffer content) and the window view
         visible_nodes = [
             cropped
-            for cropped in (crop_to_range(node, column_height_pixels, top_line, bottom_line) for node in nodes)
+            for cropped in (
+                crop_to_range(node, column_height_pixels, top_line, bottom_line)
+                for node in nodes
+            )
             if cropped is not None
         ]
         log.debug(visible_nodes)
@@ -149,28 +165,36 @@ class NvimImage:
         async def do_stuff() -> None:
             loop: asyncio.AbstractEventLoop = self.nvim.loop
             # start processing new sixel content in another thread
-            blobs = await asyncio.gather(*(
-                loop.run_in_executor(None, prepare_blob, *node)
-                for node in visible_nodes
-            ))
+            blobs = await asyncio.gather(
+                *(
+                    loop.run_in_executor(None, prepare_blob, *node)
+                    for node in visible_nodes
+                )
+            )
             # update_cache(self._content_cache, blobs)
 
             params = [
-                (node_blob[1], (row + (node_blob[0].range[0] - top_line) + 1, col + start_column + 1)) for node_blob in blobs if node_blob is not None
+                (
+                    node_blob[1],
+                    (
+                        row + (node_blob[0].range[0] - top_line) + 1,
+                        col + start_column + 1,
+                    ),
+                )
+                for node_blob in blobs
+                if node_blob is not None
             ]
 
-            self.nvim.async_call(
-                self.nvim.lua.draw_sixels,
-                params
-            )
+            self.nvim.async_call(self.nvim.lua.draw_sixels, params)
 
         asyncio.create_task(do_stuff())
 
         # TODO: push blobs to lua for speed?
 
-
     def handle_exception(self, _: asyncio.AbstractEventLoop, context: Any) -> None:
-        if (exception := context.get("exception")) is None or not isinstance(exception, Exception):
+        if (exception := context.get("exception")) is None or not isinstance(
+            exception, Exception
+        ):
             message = context.get("message")
             log.error("Handler got non-exception: %s", message)
             return
@@ -178,9 +202,7 @@ class NvimImage:
             formatted = traceback.format_exception(exception)
         elif hasattr(exception, "__traceback__"):
             formatted = traceback.format_exception(
-                type(exception),
-                exception,
-                exception.__traceback__
+                type(exception), exception, exception.__traceback__
             )
         else:
             formatted = "(Could not get stack trace)"
@@ -188,14 +210,15 @@ class NvimImage:
         log.error(f"Error occurred:\n{''.join(formatted)}")
         log.debug("", exc_info=True)
 
-
     def _draw_sixel(self, path: Path, target_height: int):
         return path_to_sixel(
             path,
             CropDims(height=target_height, top_bottom=None),
         )
 
-    async def draw_sixel(self, path: Path, start: Tuple[int, int], target_height: int) -> None:
+    async def draw_sixel(
+        self, path: Path, start: Tuple[int, int], target_height: int
+    ) -> None:
         loop: asyncio.AbstractEventLoop = self.nvim.loop
         sixel = await loop.run_in_executor(None, self._draw_sixel, path, target_height)
         self.nvim.async_call(

@@ -26,6 +26,7 @@ class CropDims:
     height: int
     top_bottom: Optional[Tuple[int, int]]
 
+
 def image_to_sixel(image: Image, dims: CropDims) -> Optional[bytes]:
     factor = dims.height / image.height
     # log.debug("%s %s", factor, img.width)
@@ -34,7 +35,7 @@ def image_to_sixel(image: Image, dims: CropDims) -> Optional[bytes]:
 
     if dims.top_bottom is not None:
         top, bottom = dims.top_bottom
-        image.crop(top=top, height=image.height-bottom)
+        image.crop(top=top, height=image.height - bottom)
 
     return image.make_blob("sixel")
 
@@ -59,7 +60,7 @@ def prepare_blob(node: Node, dims: CropDims) -> Optional[Tuple[Node, bytes]]:
 
 def generate_content(node: Node) -> Image:
     path = path_from_content(node)
-    missing = not path.exists();
+    missing = not path.exists()
 
     if missing:
         if node.content_type == ContentType.FILE:
@@ -75,15 +76,12 @@ def generate_content(node: Node) -> Image:
     # // rewrite path if ending as tex or gnuplot file
     if node.content_type == ContentType.FILE:
         if path.suffix == ".tex":
-            path = parse_latex_from_file(path);
+            path = parse_latex_from_file(path)
         elif path.suffix == ".plt":
             new_path = generate_latex_from_gnuplot_file(path)
-            path = new_path.with_suffix(".svg");
+            path = new_path.with_suffix(".svg")
 
-    image = Image(
-        resolution=(600.0, 600.0),
-        filename=str(path)
-    )
+    image = Image(resolution=(600.0, 600.0), filename=str(path))
     # image.compression_quality = 5
     # image.transform_colorspace("gray")
     # image.quantize(8, "gray", 0, False, False)

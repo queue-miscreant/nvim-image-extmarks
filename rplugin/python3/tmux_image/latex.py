@@ -25,7 +25,7 @@ $$
 
 
 def path_from_content(node: Node) -> Path:
-    content_hash = node.content_id;
+    content_hash = node.content_id
     if node.content_type == ContentType.FILE:
         return Path(node.content).expanduser()
     return Path(ART_PATH, content_hash).with_suffix(".svg")
@@ -54,7 +54,7 @@ def parse_latex_output(buf: str):
     for elm in buf.split("\n"):
         log.error(elm)
         if elm.startswith("! "):
-            err[0] = elm;
+            err[0] = elm
         elif elm.startswith("l.") and elm.find("Emergency stop") == -1:
             elms = elm.removeprefix("1.")
             if elm == elms:
@@ -68,16 +68,17 @@ def parse_latex_output(buf: str):
                 pass
 
             if elm_two != "":
-                err[1] = elm_two;
+                err[1] = elm_two
 
     return err
+
 
 def generate_svg_from_latex(path: Path, zoom: float) -> Path:
     # TODO: In rust, these are typed as Maybes and used unwrap()
     dest_path = path.parent
 
     # use latex to generate a dvi
-    dvi_path = path.with_suffix(".dvi");
+    dvi_path = path.with_suffix(".dvi")
     if not dvi_path.exists():
         latex_path = shutil.which("latex")
         if latex_path is None:
@@ -89,8 +90,8 @@ def generate_svg_from_latex(path: Path, zoom: float) -> Path:
             stderr=subprocess.PIPE,
             cwd=dest_path,
         )
-            # .arg("--jobname").arg(&dvi_path)
-            # .expect("Could not spawn latex");
+        # .arg("--jobname").arg(&dvi_path)
+        # .expect("Could not spawn latex");
 
         stdout, stderr = cmd.communicate()
 
@@ -109,7 +110,7 @@ def generate_svg_from_latex(path: Path, zoom: float) -> Path:
             raise RuntimeError(parse_latex_output(buf))
 
     # convert the dvi to a svg file with the woff font format
-    svg_path = path.with_suffix(".svg");
+    svg_path = path.with_suffix(".svg")
     if not svg_path.exists() and dvi_path.exists():
         dvisvgm_path = shutil.which("dvisvgm")
         if dvisvgm_path is None:
@@ -125,7 +126,7 @@ def generate_svg_from_latex(path: Path, zoom: float) -> Path:
         stdout, stderr = cmd.communicate()
 
         retval = cmd.wait()
-        buf = stderr.decode();
+        buf = stderr.decode()
         if retval != 0 or buf.find("error:") != -1:
             buf = stdout.decode()
 
@@ -135,13 +136,13 @@ def generate_svg_from_latex(path: Path, zoom: float) -> Path:
 
 
 def generate_latex_from_gnuplot(content: str) -> Path:
-    '''
+    """
     Generate latex file from gnuplot
 
     This function generates a latex file with gnuplot `epslatex` backend and then source it into
     the generate latex function
-    '''
-    path = (Path(ART_PATH) / hash_content(content)).with_suffix(".tex");
+    """
+    path = (Path(ART_PATH) / hash_content(content)).with_suffix(".tex")
 
     gnuplot_path = shutil.which("gnuplot")
     if gnuplot_path is None:
@@ -160,6 +161,7 @@ def generate_latex_from_gnuplot(content: str) -> Path:
 
     return path
 
+
 def generate_latex_from_gnuplot_file(path: Path) -> Path:
     with open(path) as gnuplot_file:
         content = gnuplot_file.read()
@@ -167,22 +169,24 @@ def generate_latex_from_gnuplot_file(path: Path) -> Path:
     path = generate_latex_from_gnuplot(content)
     return generate_svg_from_latex(path, 1.0)
 
+
 def parse_latex(
     content: str,
 ) -> Path:
-    '''Parse a latex content and convert it to a SVG file'''
-    path = (Path(ART_PATH) / hash_content(content)).with_suffix(".svg");
+    """Parse a latex content and convert it to a SVG file"""
+    path = (Path(ART_PATH) / hash_content(content)).with_suffix(".svg")
 
     # create a new tex file containing the equation
     tex_path = path.with_suffix(".tex")
     if not tex_path.exists():
-         with open(tex_path, "w") as file:
-             file.write(content)
+        with open(tex_path, "w") as file:
+            file.write(content)
 
     if not path.exists():
         generate_svg_from_latex(path, 1.0)
 
     return path
+
 
 def parse_latex_from_file(
     path: Path,

@@ -6,7 +6,7 @@ import itertools
 import logging
 import re
 
-from typing import Dict, List, Literal, Optional, Tuple, TypeAlias
+from typing import Dict, List, Literal, Optional, Tuple
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -82,7 +82,7 @@ def make_file_content(
     try:
         return Node(
             content_id=hash_content("\n".join(filepath)),
-            range=(line_number, line_number + line_count),
+            range=(line_number + 1, line_number + line_count),
             content=filepath,
             content_type=ContentType.FILE,
         )
