@@ -52,6 +52,12 @@ function draw_sixel(blob, winpos)
   end)
 end
 
+function draw_sixels(blob_ranges)
+  for i, blob_range in ipairs(blob_ranges) do
+    draw_sixel(unpack(blob_range))
+  end
+end
+
 function clear_screen()
   -- clear screen with :mode
   vim.cmd("mode")
