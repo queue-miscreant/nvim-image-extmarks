@@ -7,46 +7,84 @@ from typing import Optional, Tuple
 from wand.image import Image
 
 from tmux_image.delimit import Node, ContentType
+from tmux_image.latex import (
+    path_from_content,
+    parse_equation,
+    parse_latex,
+    parse_latex_from_file,
+    generate_svg_from_latex,
+    generate_latex_from_gnuplot,
+    generate_latex_from_gnuplot_file,
+)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
+
 
 @dataclass
 class CropDims:
     height: int
     top_bottom: Optional[Tuple[int, int]]
 
+def image_to_sixel(image: Image, dims: CropDims) -> Optional[bytes]:
+    factor = dims.height / image.height
+    # log.debug("%s %s", factor, img.width)
+    # log.debug(img.height)
+    image.resize(int(image.width * factor), int(image.height * factor))
 
-def to_sixel(path: Path, dims: CropDims) -> Optional[bytes]:
+    if dims.top_bottom is not None:
+        top, bottom = dims.top_bottom
+        image.crop(top=top, height=image.height-bottom)
+
+    return image.make_blob("sixel")
+
+
+def path_to_sixel(path: Path, dims: CropDims) -> Optional[bytes]:
     if not path.exists():
         raise ValueError("File does not exist")
 
     with Image(filename=str(path)) as img:
-        factor = dims.height / img.height
-        # log.debug("%s %s", factor, img.width)
-        # log.debug(img.height)
-        img.resize(int(img.width * factor), int(img.height * factor))
-
-        if dims.top_bottom is not None:
-            top, bottom = dims.top_bottom
-            img.crop(top=top, height=img.height-bottom)
-
-        return img.make_blob("sixel")
+        return image_to_sixel(img, dims)
 
 
-def generate_content(node: Node, dims: CropDims) -> Optional[Tuple[Node, bytes]]:
-    blob = None
-    if node.content_type == ContentType.FILE:
-        try:
-            blob = to_sixel(Path(node.content).expanduser(), dims)
-        except ValueError as exc:
-            log.error(exc.args[0])
-            log.debug("", exc_info=True)
-            return None
-    else:
-        pass
+def prepare_blob(node: Node, dims: CropDims) -> Optional[Tuple[Node, bytes]]:
+    image = generate_content(node)
+    blob = image_to_sixel(image, dims)
 
     if blob is None:
         return None
 
     return node, blob
+
+
+def generate_content(node: Node) -> Image:
+    path = path_from_content(node)
+    missing = not path.exists();
+
+    if missing:
+        if node.content_type == ContentType.FILE:
+            raise FileNotFoundError(f"Could not find file {path}!")
+        if node.content_type == ContentType.MATH:
+            path = parse_equation(node, 1.0)
+        elif node.content_type == ContentType.TEX:
+            path = parse_latex(node.content)
+        elif node.content_type == ContentType.GNUPLOT:
+            new_path = generate_latex_from_gnuplot(node.content)
+            generate_svg_from_latex(path, 1.0)
+
+    # // rewrite path if ending as tex or gnuplot file
+    if node.content_type == ContentType.FILE:
+        if path.suffix == ".tex":
+            path = parse_latex_from_file(path);
+        elif path.suffix == ".plt":
+            new_path = generate_latex_from_gnuplot_file(path)
+            path = new_path.with_suffix(".svg");
+
+    image = Image(
+        resolution=(600.0, 600.0),
+        filename=str(path)
+    )
+    # image.compression_quality = 5
+    # image.transform_colorspace("gray")
+    # image.quantize(8, "gray", 0, False, False)
+    return image

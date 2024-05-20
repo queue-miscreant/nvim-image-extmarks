@@ -10,8 +10,9 @@ from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
 import pynvim
 from pynvim.api import Buffer, Window
-from tmux_image.image import to_sixel, generate_content, CropDims
+from tmux_image.image import path_to_sixel, prepare_blob, CropDims
 from tmux_image.delimit import process_content, DEFAULT_REGEXES, Node
+from tmux_image.latex import ART_PATH
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -82,6 +83,9 @@ class NvimImage:
         # TODO: configurable
         self._regexes = DEFAULT_REGEXES
 
+        if not ART_PATH.exists():
+            ART_PATH.mkdir()
+
         nvim.loop.set_exception_handler(self.handle_exception)
         logging.getLogger().addHandler(self._handler)
 
@@ -146,7 +150,7 @@ class NvimImage:
             loop: asyncio.AbstractEventLoop = self.nvim.loop
             # start processing new sixel content in another thread
             blobs = await asyncio.gather(*(
-                loop.run_in_executor(None, generate_content, *node)
+                loop.run_in_executor(None, prepare_blob, *node)
                 for node in visible_nodes
             ))
             # update_cache(self._content_cache, blobs)
@@ -186,7 +190,7 @@ class NvimImage:
 
 
     def _draw_sixel(self, path: Path, target_height: int):
-        return to_sixel(
+        return path_to_sixel(
             path,
             CropDims(height=target_height, top_bottom=None),
         )
