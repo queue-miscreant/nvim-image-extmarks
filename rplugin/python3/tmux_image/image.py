@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from typing import Optional, Tuple
+from typing import Optional, Dict, Tuple
 
 from wand.image import Image
 
@@ -21,10 +21,16 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CropDims:
     height: int
     top_bottom: Optional[Tuple[int, int]]
+
+
+@dataclass
+class SixelCache:
+    content_id: str
+    blob_cache: Dict[CropDims, bytes]
 
 
 def image_to_sixel(image: Image, dims: CropDims) -> Optional[bytes]:
@@ -48,12 +54,18 @@ def path_to_sixel(path: Path, dims: CropDims) -> Optional[bytes]:
         return image_to_sixel(img, dims)
 
 
-def prepare_blob(node: Node, dims: CropDims) -> Optional[Tuple[Node, bytes]]:
+def prepare_blob(node: Node, dims: CropDims, sixel_cache: Dict[str, SixelCache]) -> Optional[Tuple[Node, bytes]]:
+    if (cache := sixel_cache.get(node.content_id)) and dims in cache.blob_cache:
+        return node, cache.blob_cache[dims]
     image = generate_content(node)
     blob = image_to_sixel(image, dims)
 
     if blob is None:
         return None
+
+    if node.content_id not in sixel_cache:
+        sixel_cache[node.content_id] = SixelCache(node.content_id, {})
+    sixel_cache[node.content_id].blob_cache[dims] = blob
 
     return node, blob
 

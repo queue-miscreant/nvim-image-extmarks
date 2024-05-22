@@ -70,57 +70,26 @@ end
 
 pcall(get_tty)
 
-
-function DrawInner()
-    -- local res = s:inst.call("draw", [""], "string") 
-    -- local res = json_decode(res)
-    local res = {}
-
-    if res.err ~= nil then
-	vim.api.nvim_notify("Error: " .. res.err, 4, {})
-    elseif res.ok == 1 then
-	Draw()
-    end
-end
-
-function Draw()
-    if timer ~= nil then
-        timer:stop()
-    end
-
-    timer = vim.loop.new_timer()
-    timer:start(50, 0, function() DrawInner() end)
-end
-
-local callbacks = {}
+callbacks = {}
 
 function callbacks.TextChanged()
-    -- call s:UpdateMetadata()
-    -- local current_buf = table.concat(
-    --   vim.fn.getline(1, '$'),
-    --   "\n",
-    -- )
     local res = vim.fn.VimImageUpdateContent()
-    -- let res = json_decode(res)['ok']
+end
 
-    if res.update_folding ~= nil then
-        local folds = res.update_folding
-        -- call s:UpdateFolds()
-    end
-    if res.should_redraw then
-        Draw()
-    end
+function callbacks.CursorMoved()
+    local res = vim.fn.VimImageRedrawContent()
 end
 
 
 function bind_autocmds()
   vim.cmd [[
   augroup VimImage
-      autocmd!
-    autocmd VimEnter,TextChanged,InsertLeave * lua callbacks.TextChanged()
-    " autocmd VimResized * lua <SID>UpdateMetadata()
-    " autocmd CursorMoved * lua <SID>UpdateMetadata()
-    autocmd InsertEnter * lua clear_screen()
+    autocmd!
+    autocmd VimEnter,TextChanged,InsertLeave <buffer> lua callbacks.TextChanged()
+    autocmd VimResized <buffer> lua callbacks.CursorMoved()
+    autocmd CursorMoved <buffer> lua callbacks.CursorMoved()
+    autocmd InsertEnter <buffer> lua clear_screen()
+    autocmd ExitPre,TabClosed,WinClosed,WinLeave <buffer> lua clear_screen()
   augroup END
   ]]
 end

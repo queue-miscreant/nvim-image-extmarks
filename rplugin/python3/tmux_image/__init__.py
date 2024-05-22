@@ -10,7 +10,7 @@ from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
 import pynvim
 from pynvim.api import Buffer, Window
-from tmux_image.image import path_to_sixel, prepare_blob, CropDims
+from tmux_image.image import path_to_sixel, prepare_blob, SixelCache, CropDims
 from tmux_image.delimit import process_content, DEFAULT_REGEXES, Node
 from tmux_image.latex import ART_PATH
 
@@ -75,11 +75,27 @@ class NvimHandler(logging.Handler):
 # content cache: id to sixel cache
 # sixel cache: range to blob
 
+@dataclass
+class WindowDims:
+    top_line: int
+    bottom_line: int
+    start_line: int
+    window_column: int
+    start_column: int
+
 
 @dataclass
-class SixelCache:
-    content_id: str
-    blob_cache: Dict[CropDims, str]
+class WindowDisplay:
+    dims: WindowDims
+    nodes: Optional[List[Tuple[Node, CropDims]]]
+
+
+def window_to_terminal(start_row: int, dims: WindowDims):
+    '''Convert window coordinates (start_row, end_row) to terminal coordinates'''
+    row = dims.start_line + start_row - dims.top_line
+    column = dims.window_column + dims.start_column
+
+    return row, column
 
 
 @pynvim.plugin
@@ -88,16 +104,47 @@ class NvimImage:
         self.nvim = nvim
         self._handler = NvimHandler(nvim, level=logging.INFO)
 
-        self._content_cache: Dict[str, SixelCache] = {}
+        self._content_cache: Dict[int, List[Node]] = {}
+        self._sixel_cache: Dict[str, SixelCache] = {}
 
         # TODO: configurable
         self._regexes = DEFAULT_REGEXES
+        self._last_window_display: Dict[int, WindowDisplay] = {}
 
         if not ART_PATH.exists():
             ART_PATH.mkdir()
 
         nvim.loop.set_exception_handler(self.handle_exception)
         logging.getLogger().addHandler(self._handler)
+
+    def update_window_cache(self) -> Optional[WindowDisplay]:
+        wininfo = self.nvim.call("getwininfo", self.nvim.call("win_getid"))
+
+        window_id = wininfo[0].get("winid")
+        new_dims = WindowDims(
+            top_line = wininfo[0].get("topline"),
+            bottom_line = wininfo[0].get("botline"),
+            start_line = wininfo[0].get("winrow"),
+            window_column = wininfo[0].get("wincol"),
+            start_column = wininfo[0].get("textoff"),
+        )
+        if new_dims.top_line is None or new_dims.start_column is None:
+            log.critical("Could not get top line of window or starting column!")
+            return None
+
+        display = self._last_window_display.get(window_id)
+        if display is None:
+            display = WindowDisplay(
+                dims=new_dims,
+                nodes=None,
+            )
+            self._last_window_display[window_id] = display
+        else:
+            if new_dims != display.dims:
+                display.nodes = None
+            display.dims = new_dims
+
+        return display
 
     @pynvim.command("OpenImage", nargs=1, range=True, sync=True, complete="file")
     def open_image(self, args: List[str], range: Tuple[int, int]) -> None:
@@ -106,19 +153,17 @@ class NvimImage:
         drawing_params: Tuple[int | None, int | None, int] = (
             self.nvim.lua.get_drawing_params()
         )
-        start_column, topline, column_height_pixels = drawing_params
+        _, __, column_height_pixels = drawing_params
 
-        if topline is None or start_column is None:
-            log.critical("Could not get top line of window or starting column!")
+        display = self.update_window_cache()
+        if display is None:
             return
 
-        window: Window = self.nvim.current.window
-        row, col = (window.row, window.col)
-
+        self.nvim.lua.clear_screen()
         asyncio.create_task(
             self.draw_sixel(
                 Path(args[0]),
-                (row + (start - topline) + 1, col + start_column + 1),
+                window_to_terminal(start, display.dims),
                 (end - start) * column_height_pixels,
             )
         )
@@ -126,60 +171,66 @@ class NvimImage:
     @pynvim.function("VimImageUpdateContent", sync=True)
     def update_content(self, args: List[str]):
         buffer: Buffer = self.nvim.current.buffer
-        # this can be async
+        # This can be async from nvim...
         nodes = process_content(
             buffer[:],
             self._regexes,
         )
+        self._content_cache[buffer.number] = nodes
+        # ...but this can't be
+        self.draw_visible(nodes, force=True)
 
+    @pynvim.function("VimImageRedrawContent", sync=True)
+    def redraw_content(self, args: List[str]):
+        buffer: Buffer = self.nvim.current.buffer
+        if (nodes := self._content_cache.get(buffer.number)) is not None:
+            self.draw_visible(nodes)
+
+    def draw_visible(self, nodes: List[Node], force=False):
         # this must be sync
         # this should get all windows in the current tabpage!
         drawing_params: Tuple[int | None, int | None, int] = (
             self.nvim.lua.get_drawing_params()
         )
-        start_column, _, column_height_pixels = drawing_params
-        if start_column is None:
-            log.critical("Could not get top line of window or starting column!")
+        _, __, column_height_pixels = drawing_params
+
+        display = self.update_window_cache()
+        if display is None:
             return
 
-        # TODO: duplicated
-        wininfo = self.nvim.call("getwininfo", self.nvim.call("win_getid"))
-
-        top_line = wininfo[0].get("topline")
-        bottom_line = wininfo[0].get("botline")
-
-        window: Window = self.nvim.current.window
-        row, col = (window.row, window.col)
-
-        # combine ranges from this (buffer content) and the window view
-        visible_nodes = [
-            cropped
-            for cropped in (
-                crop_to_range(node, column_height_pixels, top_line, bottom_line)
-                for node in nodes
-            )
-            if cropped is not None
-        ]
-        log.debug(visible_nodes)
+        if display.nodes is None or force:
+            # combine ranges from this (buffer content) and the window view
+            visible_nodes = [
+                cropped
+                for cropped in (
+                    crop_to_range(node, column_height_pixels, display.dims.top_line, display.dims.bottom_line)
+                    for node in nodes
+                )
+                if cropped is not None
+            ]
+            for node in self._content_cache[self.nvim.current.buffer.number]:
+                for visible, _ in visible_nodes:
+                    if node.content_id == visible.content_id:
+                        node.range = visible.range
+                        break
+            display.nodes = visible_nodes
+        else:
+            return
 
         async def do_stuff() -> None:
             loop: asyncio.AbstractEventLoop = self.nvim.loop
             # start processing new sixel content in another thread
             blobs = await asyncio.gather(
                 *(
-                    loop.run_in_executor(None, prepare_blob, *node)
-                    for node in visible_nodes
+                    loop.run_in_executor(None, prepare_blob, node, dims, self._sixel_cache)
+                    for node, dims in visible_nodes
                 )
             )
-            # update_cache(self._content_cache, blobs)
 
             params = [
                 (
                     node_blob[1],
-                    (
-                        row + (node_blob[0].range[0] - top_line) + 1,
-                        col + start_column + 1,
-                    ),
+                    window_to_terminal(node_blob[0].range[0], display.dims)
                 )
                 for node_blob in blobs
                 if node_blob is not None
@@ -187,6 +238,7 @@ class NvimImage:
 
             self.nvim.async_call(self.nvim.lua.draw_sixels, params)
 
+        self.nvim.lua.clear_screen()
         asyncio.create_task(do_stuff())
 
         # TODO: push blobs to lua for speed?
