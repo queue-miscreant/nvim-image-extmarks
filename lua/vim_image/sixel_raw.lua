@@ -75,7 +75,7 @@ function sixel_raw.draw_sixels(blob_ranges)
     local stdout = assert(io.open(sixel_raw.tty, "ab"))
     stdout:write("\x1b[s")
 
-    for i, blob_range in ipairs(blob_ranges) do
+    for _, blob_range in ipairs(blob_ranges) do
       local winpos = blob_range[2]
       stdout:write(("\x1b[%d;%dH"):format(winpos[1], winpos[2]))
       stdout:write(blob_range[1])

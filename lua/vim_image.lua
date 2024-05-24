@@ -14,11 +14,13 @@ end
 callbacks = {}
 
 function callbacks.TextChanged()
-    local res = vim.fn.VimImageUpdateContent()
+    -- local res = vim.fn.VimImageUpdateContent()
+    sixel_interface:draw_visible_blobs()
 end
 
 function callbacks.CursorMoved()
-    local res = vim.fn.VimImageRedrawContent()
+    -- local res = vim.fn.VimImageRedrawContent()
+    sixel_interface:draw_visible_blobs()
 end
 
 

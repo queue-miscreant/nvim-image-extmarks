@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import traceback
 
-from typing import Any, DefaultDict, Dict, List, Optional, Tuple
+from typing import Any, TypedDict, DefaultDict, Dict, List, Optional, Tuple
 
 import pynvim
 from pynvim.api import Buffer, Window
@@ -90,6 +90,15 @@ class WindowDisplay:
     nodes: Optional[List[Tuple[Node, CropDims]]]
 
 
+class WrappedExtmark(TypedDict):
+    id: int
+    start_row: int
+    end_row: int
+    height: int
+    crop_row_start: int
+    crop_row_end: int
+
+
 def window_to_terminal(start_row: int, dims: WindowDims):
     '''Convert window coordinates (start_row, end_row) to terminal coordinates'''
     row = dims.start_line + start_row - dims.top_line
@@ -167,6 +176,43 @@ class NvimImage:
                 (end - start) * column_height_pixels,
             )
         )
+
+
+    async def _cache_blob(
+        self,
+        wrapped_extmark: WrappedExtmark,
+        content_path: str,
+        char_pixel_height: int
+    ):
+        try:
+            blob = await self.nvim.loop.run_in_executor(
+                None,
+                path_to_sixel,
+                Path(content_path).expanduser(),
+                CropDims(
+                    height=wrapped_extmark["height"] * char_pixel_height,
+                    top_bottom=(
+                        wrapped_extmark["crop_row_start"] * char_pixel_height,
+                        wrapped_extmark["crop_row_end"] * char_pixel_height
+                    )
+                ),
+            )
+        except ValueError:
+            log.error("Could not open file %s!", content_path)
+            return
+
+        self.nvim.async_call(
+            self.nvim.lua.sixel_interface.cache_and_draw_blob,
+            blob,
+            content_path,
+            wrapped_extmark
+        )
+
+
+    @pynvim.function("VimImageCacheBlob", sync=True)
+    def cache_blob(self, args: Tuple[WrappedExtmark, str, int]):
+        asyncio.create_task(self._cache_blob(*args))
+
 
     @pynvim.function("VimImageUpdateContent", sync=True)
     def update_content(self, args: List[str]):

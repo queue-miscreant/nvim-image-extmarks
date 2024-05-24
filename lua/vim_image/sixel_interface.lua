@@ -1,7 +1,7 @@
 require "vim_image/sixel_raw"
 
 -- Blobs are cached by the following characteristics:
--- 
+--
 -- - Layer 1:
 --      - Content hash
 -- - Layer 2:
@@ -45,6 +45,19 @@ local function extmark_to_cache_id(extmark)
   )
 end
 
+---@return window_dimensions
+local function get_windims()
+  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
+
+  return {
+      top_line = wininfo[1].topline,
+      bottom_line = wininfo[1].botline,
+      start_line = wininfo[1].winrow,
+      window_column = wininfo[1].wincol,
+      start_column = wininfo[1].textoff,
+  }
+end
+
 
 ---@param blob string
 ---@param blob_id string
@@ -71,12 +84,37 @@ function sixel_interface:_get_from_cache(blob_id, extmark)
   end
 
   local index = extmark_to_cache_id(extmark)
-
   if cached[index] == nil then
     return nil
   end
 
   return cached[index]
+end
+
+
+-- Convert window coordinates (start_row, end_row) to terminal coordinates
+---@param start_row integer The row of the buffer to start drawing on
+---@param windims window_dimensions The current dimensions of the window
+---@return [integer, integer]
+local function window_to_terminal(start_row, windims)
+    local row = windims.start_line + start_row - windims.top_line
+    local column = windims.window_column + windims.start_column
+
+    return { row, column }
+end
+
+
+---@param blob string
+---@param blob_id string
+---@param extmark wrapped_extmark
+function sixel_interface.cache_and_draw_blob(blob, blob_id, extmark)
+  sixel_interface:_cache_blob(blob, blob_id, extmark)
+
+  local windims = get_windims()
+  sixel_raw.draw_sixel(
+    blob,
+    window_to_terminal(extmark.start_row - extmark.crop_row_start, windims)
+  )
 end
 
 
@@ -109,20 +147,11 @@ function sixel_interface:get_visible_extmarks(top_line, bottom_line)
 end
 
 
--- Convert window coordinates (start_row, end_row) to terminal coordinates
----@param start_row integer The row of the buffer to start drawing on
----@param windims window_dimensions The current dimensions of the window
-local function window_to_terminal(start_row, windims)
-    local row = windims.start_line + start_row - windims.top_line
-    local column = windims.window_column + windims.start_column
-
-    return row, column
-end
-
-
 ---@param windims window_dimensions
 ---@param extmark wrapped_extmark
-function sixel_interface:_lookup_blob_by_extmark(extmark, windims)
+---@param char_pixel_height integer
+---@return [string, [number, number]] | nil
+function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_height)
   local blob_id = vim.b.image_extmark_to_blob_id[tostring(extmark.id)]
   if blob_id == nil then
     vim.api.nvim_buf_set_extmark(0, self.namespace, extmark.start_row, 0, {
@@ -138,8 +167,10 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims)
     id=extmark.id,
     end_row=extmark.end_row,
   })
+
   local cursor_row = vim.fn.line(".") - 1
   -- Hide the extmark if the cursor is there
+  -- TODO: on cursor move, check if there's an extmark at its new position
   if extmark.start_row <= cursor_row and cursor_row <= extmark.end_row then
     return nil
   end
@@ -148,10 +179,11 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims)
   if cache_lookup == nil then
     -- TODO: async request from backend
     -- Needed async guarantees: window position and other drawing parameters are unchanged
+    vim.fn.VimImageCacheBlob(extmark, blob_id, char_pixel_height)
     return nil
   end
 
-  return cache_lookup, window_to_terminal(extmark.start_row - extmark.crop_row_start, windims)
+  return { cache_lookup, window_to_terminal(extmark.start_row - extmark.crop_row_start, windims) }
 end
 
 
@@ -170,34 +202,28 @@ function sixel_interface:create_image(start_row, end_row, path)
     vim.fn.escape(path, "'\\")
   ))
 
-  -- TODO: try to draw it
+  self:draw_visible_blobs()
 end
 
 
 function sixel_interface:draw_visible_blobs()
-  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
-
-  -- TODO: probably useless
-  local new_dims = {
-      top_line = wininfo[1].topline,
-      bottom_line = wininfo[1].botline,
-      start_line = wininfo[1].winrow,
-      window_column = wininfo[1].wincol,
-      start_column = wininfo[1].textoff,
-  }
+  sixel_raw.clear_screen()
+  local windims = get_windims()
 
   local visible_extmarks = self:get_visible_extmarks(
-    new_dims.top_line - 1,
-    new_dims.bottom_line - 1
+    windims.top_line - 1,
+    windims.bottom_line - 1
   )
 
   if vim.b.image_extmark_to_blob_id == nil then
     vim.b.image_extmark_to_blob_id = vim.empty_dict()
   end
 
+  local char_pixel_height = sixel_raw.char_pixel_height()
+
   sixel_raw.draw_sixels(
     vim.tbl_map(
-      function(extmark) self:_lookup_blob_by_extmark(extmark, new_dims) end,
+      function(extmark) return self:_lookup_blob_by_extmark(extmark, windims, char_pixel_height) end,
       visible_extmarks
     )
   )
