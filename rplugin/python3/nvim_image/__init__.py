@@ -10,9 +10,9 @@ from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
 import pynvim
 from pynvim.api import Buffer, Window
-from tmux_image.image import path_to_sixel, prepare_blob, SixelCache, CropDims
-from tmux_image.delimit import process_content, DEFAULT_REGEXES, Node
-from tmux_image.latex import ART_PATH
+from nvim_image.image import path_to_sixel, prepare_blob, SixelCache, CropDims
+from nvim_image.delimit import process_content, DEFAULT_REGEXES, Node
+from nvim_image.latex import ART_PATH
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)

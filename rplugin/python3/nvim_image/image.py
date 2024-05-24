@@ -6,8 +6,8 @@ from typing import Optional, Dict, Tuple
 
 from wand.image import Image
 
-from tmux_image.delimit import Node, ContentType
-from tmux_image.latex import (
+from nvim_image.delimit import Node, ContentType
+from nvim_image.latex import (
     path_from_content,
     parse_equation,
     parse_latex,
