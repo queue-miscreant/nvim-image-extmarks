@@ -42,9 +42,7 @@ def parse_equation(
     tex_path = path.with_suffix(".tex")
     if not tex_path.exists():
         with open(tex_path, "w") as file:
-            file.write(MATH_START)
-            file.write(node.content)
-            file.write(MATH_END)
+            file.writelines([MATH_START, node.content, MATH_END])
 
     return generate_svg_from_latex(path, zoom)
 

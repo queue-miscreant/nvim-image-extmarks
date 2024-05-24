@@ -159,7 +159,7 @@ class NvimImage:
         if display is None:
             return
 
-        self.nvim.lua.clear_screen()
+        self.nvim.lua.sixel_raw.clear_screen()
         asyncio.create_task(
             self.draw_sixel(
                 Path(args[0]),
@@ -236,9 +236,9 @@ class NvimImage:
                 if node_blob is not None
             ]
 
-            self.nvim.async_call(self.nvim.lua.draw_sixels, params)
+            self.nvim.async_call(self.nvim.lua.sixel_raw.draw_sixels, params)
 
-        self.nvim.lua.clear_screen()
+        self.nvim.lua.sixel_raw.clear_screen()
         asyncio.create_task(do_stuff())
 
         # TODO: push blobs to lua for speed?
@@ -274,7 +274,7 @@ class NvimImage:
         loop: asyncio.AbstractEventLoop = self.nvim.loop
         sixel = await loop.run_in_executor(None, self._draw_sixel, path, target_height)
         self.nvim.async_call(
-            self.nvim.lua.draw_sixel,
+            self.nvim.lua.sixel_raw.draw_sixel,
             sixel,
             start,
         )

@@ -10,7 +10,7 @@ Requirements
 - LaTeX (optional)
 - Python libraries:
     - pynvim
-    - wand (Python Imagemagick wrapper)
+    - wand (Python ImageMagick wrapper)
 
 
 Installation
@@ -64,3 +64,5 @@ TODOs
 - Asynchronously draw images
     - LaTeX update rendering currently forces all images to be available first
     - Hold off drawing edited LaTeX if insert mode exited while cursor inside fence
+- Better error handling for multi-tool chains (LaTeX errors)
+    - Split plugin between extmark-like interface and fence-like interface?
