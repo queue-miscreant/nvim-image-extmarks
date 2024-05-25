@@ -9,18 +9,11 @@ require "vim_image/sixel_raw"
 --      - Crop from top of image, in rows
 --      - Crop from bottom of image (i.e., number of rows removed, as a full image)
 
----@class wrapped_extmark
----@field id integer
----@field start_row integer
----@field end_row integer
----@field height integer
----@field crop_row_start integer
----@field crop_row_end integer
-
 pcall(sixel_raw.get_tty)
 sixel_interface = {
   namespace = vim.api.nvim_create_namespace("Nvim-image"),
-  cache = {}
+  cache = {},
+  debounce = {}
 }
 
 
@@ -90,6 +83,29 @@ local function window_to_terminal(start_row, windims)
     local column = windims.window_column + windims.start_column
 
     return { row, column }
+end
+
+
+---@param extmark wrapped_extmark
+---@param blob_id string
+---@param char_pixel_height integer
+local function schedule_generate_blob(extmark, blob_id, char_pixel_height)
+  if sixel_interface.debounce[tostring(extmark.id)] ~= nil then
+    return
+  end
+  sixel_interface.debounce[tostring(extmark.id)] = true
+
+  sixel_raw.convert(
+    extmark,
+    blob_id,
+    char_pixel_height,
+    function(blob)
+      vim.defer_fn(function()
+        sixel_interface.cache_and_draw_blob(blob, blob_id, extmark)
+        sixel_interface.debounce[tostring(extmark.id)] = nil
+      end, 0)
+    end
+  )
 end
 
 
@@ -164,9 +180,8 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
 
   local cache_lookup = self:_get_from_cache(blob_id, extmark)
   if cache_lookup == nil then
-    -- TODO: async request from backend
     -- Needed async guarantees: window position and other drawing parameters are unchanged
-    vim.fn.VimImageCacheBlob(extmark, blob_id, char_pixel_height)
+    schedule_generate_blob(extmark, blob_id, char_pixel_height)
     return nil
   end
 

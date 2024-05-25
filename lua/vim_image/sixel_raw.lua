@@ -5,6 +5,14 @@
 
 local ffi = require "ffi"
 
+---@class wrapped_extmark
+---@field id integer
+---@field start_row integer
+---@field end_row integer
+---@field height integer
+---@field crop_row_start integer
+---@field crop_row_end integer
+
 ---@class window_dimensions
 ---@field top_line integer
 ---@field bottom_line integer
@@ -115,4 +123,62 @@ function sixel_raw.get_windims()
       window_column = wininfo[1].wincol,
       start_column = wininfo[1].textoff,
   }
+end
+
+---@param extmark wrapped_extmark
+---@param blob_id string
+---@param char_pixel_height integer
+---@param callback function(string): any
+function sixel_raw.convert(
+  extmark,
+  blob_id,
+  char_pixel_height,
+  callback,
+  error_callback
+)
+  -- resize to a suitable height
+  local resize = ("x%d"):format(extmark.height * char_pixel_height)
+  -- crop to the right size
+  local crop = ("x%d+0+%d"):format(
+    (extmark.height - extmark.crop_row_start - extmark.crop_row_end) * char_pixel_height,
+    extmark.crop_row_start * char_pixel_height
+  )
+
+  local stdout = vim.loop.new_pipe()
+  local stderr = vim.loop.new_pipe()
+  vim.loop.spawn("convert", {
+    args = {
+      vim.fs.normalize(blob_id) .. "[0]",
+      "(",
+      "+resize",
+      resize,
+      "+crop",
+      crop,
+      ")",
+      "sixel:-"
+    },
+    stdio = {nil, stdout, stderr},
+    detached = true
+  })
+
+  -- Run ImageMagick command
+  local sixel = {}
+  stdout:read_start(function(err, data)
+      assert(not err, err)
+      if data == nil then
+        callback(table.concat(sixel, ""))
+        return
+      end
+      table.insert(sixel, data)
+  end)
+
+  local erro = ""
+  stderr:read_start(function(err, data)
+    assert(not err, err)
+    if data == nil then
+      if error_callback ~= nil then error_callback(data) end
+      return
+    end
+    erro = erro .. "\n" .. data
+  end)
 end

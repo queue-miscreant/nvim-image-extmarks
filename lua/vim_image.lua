@@ -1,6 +1,7 @@
 require "vim_image/sixel_raw"
 require "vim_image/sixel_interface"
 require "vim_image/autocmds"
+require "vim_image/wand"
 
 ---@param start_row integer
 ---@param end_row integer
