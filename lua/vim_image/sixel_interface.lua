@@ -102,7 +102,7 @@ function sixel_interface.cache_and_draw_blob(blob, blob_id, extmark)
   local windims = get_windims()
   sixel_raw.draw_sixel(
     blob,
-    window_to_terminal(extmark.start_row - extmark.crop_row_start, windims)
+    window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
   )
 end
 
@@ -117,7 +117,7 @@ function sixel_interface:get_visible_extmarks(top_line, bottom_line)
   return vim.tbl_map(function(extmark)
     local start_row, end_row = extmark[2], extmark[4].end_row
 
-    if end_row < top_line or start_row > bottom_line then
+    if end_row <= top_line or start_row > bottom_line then
       return nil
     end
 
@@ -133,8 +133,7 @@ function sixel_interface:get_visible_extmarks(top_line, bottom_line)
       id = extmark[1],
       start_row = start_row,
       end_row = end_row,
-      -- TODO: this might be unnecessary
-      height = (end_row - crop_row_end) - (start_row - crop_row_start),
+      height = end_row - start_row,
       crop_row_start = crop_row_start,
       crop_row_end = crop_row_end,
     }
@@ -173,7 +172,7 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
 
   return {
     cache_lookup,
-    window_to_terminal(extmark.start_row - extmark.crop_row_start, windims)
+    window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
   }
 end
 
