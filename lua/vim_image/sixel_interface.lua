@@ -17,22 +17,11 @@ require "vim_image/sixel_raw"
 ---@field crop_row_start integer
 ---@field crop_row_end integer
 
----@class window_dimensions
----@field top_line integer
----@field bottom_line integer
----@field start_line integer
----@field window_column integer
----@field start_column integer
-
+pcall(sixel_raw.get_tty)
 sixel_interface = {
-  namespace = nil,
+  namespace = vim.api.nvim_create_namespace("Nvim-image"),
   cache = {}
 }
-
-function sixel_interface:init()
-  self.namespace = vim.api.nvim_create_namespace("Nvim-image")
-  pcall(sixel_raw.get_tty)
-end
 
 
 ---@param extmark wrapped_extmark
@@ -120,9 +109,10 @@ end
 
 ---@param top_line integer The first line of the currently-displayed window
 ---@param bottom_line integer The last line of the currently-displayed window
----@return wrapped_extmark[]
+---@return (wrapped_extmark | nil)[]
 function sixel_interface:get_visible_extmarks(top_line, bottom_line)
   local extmarks = vim.api.nvim_buf_get_extmarks(0, self.namespace, 0, -1, { details=true })
+  local cursor_row = vim.fn.line(".")
 
   return vim.tbl_map(function(extmark)
     local start_row, end_row = extmark[2], extmark[4].end_row
@@ -133,6 +123,11 @@ function sixel_interface:get_visible_extmarks(top_line, bottom_line)
 
     local crop_row_start = math.max(0, top_line - start_row)
     local crop_row_end = math.max(0, end_row - bottom_line)
+
+    -- Hide the extmark if the cursor is there
+    if start_row <= cursor_row and cursor_row <= end_row then
+      return nil
+    end
 
     return {
       id = extmark[1],
@@ -147,8 +142,8 @@ function sixel_interface:get_visible_extmarks(top_line, bottom_line)
 end
 
 
----@param windims window_dimensions
 ---@param extmark wrapped_extmark
+---@param windims window_dimensions
 ---@param char_pixel_height integer
 ---@return [string, [number, number]] | nil
 function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_height)
@@ -168,13 +163,6 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
     end_row=extmark.end_row,
   })
 
-  local cursor_row = vim.fn.line(".") - 1
-  -- Hide the extmark if the cursor is there
-  -- TODO: on cursor move, check if there's an extmark at its new position
-  if extmark.start_row <= cursor_row and cursor_row <= extmark.end_row then
-    return nil
-  end
-
   local cache_lookup = self:_get_from_cache(blob_id, extmark)
   if cache_lookup == nil then
     -- TODO: async request from backend
@@ -183,7 +171,10 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
     return nil
   end
 
-  return { cache_lookup, window_to_terminal(extmark.start_row - extmark.crop_row_start, windims) }
+  return {
+    cache_lookup,
+    window_to_terminal(extmark.start_row - extmark.crop_row_start, windims)
+  }
 end
 
 
@@ -191,7 +182,13 @@ end
 ---@param end_row integer
 ---@param path string
 function sixel_interface:create_image(start_row, end_row, path)
-  local id = vim.api.nvim_buf_set_extmark(0, self.namespace, start_row, 0, { end_row=end_row })
+  local id = vim.api.nvim_buf_set_extmark(
+    0,
+    self.namespace,
+    start_row,
+    0,
+    { end_row=end_row }
+  )
 
   if vim.b.image_extmark_to_blob_id == nil then
     vim.b.image_extmark_to_blob_id = vim.empty_dict()
@@ -215,6 +212,15 @@ function sixel_interface:draw_visible_blobs()
     windims.bottom_line - 1
   )
 
+  self:draw_blobs(visible_extmarks, windims)
+end
+
+
+---@param extmarks (wrapped_extmark | nil)[]
+---@param windims window_dimensions
+function sixel_interface:draw_blobs(extmarks, windims)
+  sixel_raw.clear_screen()
+
   if vim.b.image_extmark_to_blob_id == nil then
     vim.b.image_extmark_to_blob_id = vim.empty_dict()
   end
@@ -223,8 +229,12 @@ function sixel_interface:draw_visible_blobs()
 
   sixel_raw.draw_sixels(
     vim.tbl_map(
-      function(extmark) return self:_lookup_blob_by_extmark(extmark, windims, char_pixel_height) end,
-      visible_extmarks
-    )
+      function(extmark) return self:_lookup_blob_by_extmark(
+        extmark,
+        windims,
+        char_pixel_height
+      ) end,
+      extmarks
+   )
   )
 end

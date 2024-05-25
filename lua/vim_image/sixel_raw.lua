@@ -5,6 +5,13 @@
 
 local ffi = require "ffi"
 
+---@class window_dimensions
+---@field top_line integer
+---@field bottom_line integer
+---@field start_line integer
+---@field window_column integer
+---@field start_column integer
+
 sixel_raw = { tty=nil }
 
 -- Ideally, this would be imported, but alas
@@ -34,7 +41,6 @@ function sixel_raw.char_pixel_height()
 end
 
 -- Acquire the tty filename and store it for use later
----@return string
 function sixel_raw.get_tty()
   local proc = assert(io.popen("tty"))
   local tty_name = proc:read()
@@ -96,4 +102,17 @@ function sixel_raw.clear_screen()
   if tmux_session ~= nil then
     vim.fn.system(("tmux detach -E 'tmux attach -t %s'"):format(tmux_session))
   end
+end
+
+---@return window_dimensions
+function sixel_raw.get_windims()
+  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
+
+  return {
+      top_line = wininfo[1].topline,
+      bottom_line = wininfo[1].botline,
+      start_line = wininfo[1].winrow,
+      window_column = wininfo[1].wincol,
+      start_column = wininfo[1].textoff,
+  }
 end
