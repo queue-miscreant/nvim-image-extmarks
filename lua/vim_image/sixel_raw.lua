@@ -36,6 +36,7 @@ struct winsize {
 int ioctl(int fd, int cmd, ...);
 ]]
 
+
 -- Perform the above ioctl operation and calculate the height of a character in pixels
 ---@return number
 function sixel_raw.char_pixel_height()
@@ -48,6 +49,7 @@ function sixel_raw.char_pixel_height()
   return 28
 end
 
+
 -- Acquire the tty filename and store it for use later
 function sixel_raw.get_tty()
   local proc = assert(io.popen("tty"))
@@ -56,6 +58,7 @@ function sixel_raw.get_tty()
 
   sixel_raw.tty = tty_name
 end
+
 
 -- Draw a sixel to the display
 -- Move the cursor to (row, column) (1-indexed), draw the blob, then reset the cursor position
@@ -75,6 +78,7 @@ function sixel_raw.draw_sixel(blob, winpos)
     stdout:close()
   end)
 end
+
 
 -- The same thing as draw_sixel, but operating on a table of blob, position pairs
 --
@@ -100,6 +104,7 @@ function sixel_raw.draw_sixels(blob_ranges)
   end)
 end
 
+
 -- Clear the screen of all sixel characters
 -- This should also work in tmux, where sixel images can appear "sticky"
 function sixel_raw.clear_screen()
@@ -124,6 +129,7 @@ function sixel_raw.get_windims()
       start_column = wininfo[1].textoff,
   }
 end
+
 
 ---@param extmark wrapped_extmark
 ---@param blob_id string

@@ -15,7 +15,7 @@ local function extmarks_needing_update(force)
 
   -- Try getting the visible extmarks, since the cache seems valid
 
-  local extmarks = sixel_interface:get_visible_extmarks(
+  local extmarks = sixel_interface.get_visible_extmarks(
     new_dims.top_line,
     new_dims.bottom_line
   )
@@ -47,7 +47,7 @@ function vim_image_callbacks.update_extmarks(force)
   local extmarks = extmarks_needing_update(force)
   if extmarks == nil then return end
 
-  sixel_interface:draw_blobs(extmarks, vim.w.vim_image_window_cache)
+  sixel_interface.draw_blobs(extmarks, vim.w.vim_image_window_cache)
 end
 
 

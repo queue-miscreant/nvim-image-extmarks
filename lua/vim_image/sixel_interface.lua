@@ -1,5 +1,11 @@
 require "vim_image/sixel_raw"
 
+---@class image_extmark
+---@field id integer
+---@field start_row integer
+---@field end_row integer
+---@field path string
+
 -- Blobs are cached by the following characteristics:
 --
 -- - Layer 1:
@@ -42,25 +48,25 @@ end
 
 
 ---@param blob string
----@param blob_id string
+---@param path string
 ---@param extmark wrapped_extmark
-function sixel_interface:_cache_blob(blob, blob_id, extmark)
+function sixel_interface._cache_blob(blob, path, extmark)
   local index = extmark_to_cache_id(extmark)
 
-  if self.cache[blob_id] ~= nil then
-    self.cache[blob_id][index] = blob
+  if sixel_interface.cache[path] ~= nil then
+    sixel_interface.cache[path][index] = blob
   else
     local temp = {}
     temp[index] = blob
-    self.cache[blob_id] = temp
+    sixel_interface.cache[path] = temp
   end
 end
 
 
----@param blob_id string
+---@param path string
 ---@param extmark wrapped_extmark
-function sixel_interface:_get_from_cache(blob_id, extmark)
-  local cached = self.cache[blob_id]
+function sixel_interface._get_from_cache(path, extmark)
+  local cached = sixel_interface.cache[path]
   if cached == nil then
     return nil
   end
@@ -87,9 +93,9 @@ end
 
 
 ---@param extmark wrapped_extmark
----@param blob_id string
+---@param path string
 ---@param char_pixel_height integer
-local function schedule_generate_blob(extmark, blob_id, char_pixel_height)
+local function schedule_generate_blob(extmark, path, char_pixel_height)
   if sixel_interface.debounce[tostring(extmark.id)] ~= nil then
     return
   end
@@ -97,11 +103,11 @@ local function schedule_generate_blob(extmark, blob_id, char_pixel_height)
 
   sixel_raw.convert(
     extmark,
-    blob_id,
+    path,
     char_pixel_height,
     function(blob)
       vim.defer_fn(function()
-        sixel_interface.cache_and_draw_blob(blob, blob_id, extmark)
+        sixel_interface.cache_and_draw_blob(blob, path, extmark)
         sixel_interface.debounce[tostring(extmark.id)] = nil
       end, 0)
     end
@@ -110,10 +116,10 @@ end
 
 
 ---@param blob string
----@param blob_id string
+---@param path string
 ---@param extmark wrapped_extmark
-function sixel_interface.cache_and_draw_blob(blob, blob_id, extmark)
-  sixel_interface:_cache_blob(blob, blob_id, extmark)
+function sixel_interface.cache_and_draw_blob(blob, path, extmark)
+  sixel_interface._cache_blob(blob, path, extmark)
 
   local windims = get_windims()
   sixel_raw.draw_sixel(
@@ -126,8 +132,8 @@ end
 ---@param top_line integer The first line of the currently-displayed window
 ---@param bottom_line integer The last line of the currently-displayed window
 ---@return (wrapped_extmark | nil)[]
-function sixel_interface:get_visible_extmarks(top_line, bottom_line)
-  local extmarks = vim.api.nvim_buf_get_extmarks(0, self.namespace, 0, -1, { details=true })
+function sixel_interface.get_visible_extmarks(top_line, bottom_line)
+  local extmarks = vim.api.nvim_buf_get_extmarks(0, sixel_interface.namespace, 0, -1, { details=true })
   local cursor_row = vim.fn.line(".")
 
   return vim.tbl_map(function(extmark)
@@ -161,10 +167,10 @@ end
 ---@param windims window_dimensions
 ---@param char_pixel_height integer
 ---@return [string, [number, number]] | nil
-function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_height)
-  local blob_id = vim.b.image_extmark_to_blob_id[tostring(extmark.id)]
-  if blob_id == nil then
-    vim.api.nvim_buf_set_extmark(0, self.namespace, extmark.start_row, 0, {
+function sixel_interface._lookup_blob_by_extmark(extmark, windims, char_pixel_height)
+  local path = vim.b.image_extmark_to_path[tostring(extmark.id)]
+  if path == nil then
+    vim.api.nvim_buf_set_extmark(0, sixel_interface.namespace, extmark.start_row, 0, {
       id=extmark.id,
       virt_text= { { "Extmark lookup failure!", "ErrorMsg" } },
       end_row=extmark.end_row,
@@ -173,15 +179,15 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
   end
 
   -- Get rid of the text
-  vim.api.nvim_buf_set_extmark(0, self.namespace, extmark.start_row, 0, {
+  vim.api.nvim_buf_set_extmark(0, sixel_interface.namespace, extmark.start_row, 0, {
     id=extmark.id,
     end_row=extmark.end_row,
   })
 
-  local cache_lookup = self:_get_from_cache(blob_id, extmark)
+  local cache_lookup = sixel_interface._get_from_cache(path, extmark)
   if cache_lookup == nil then
     -- Needed async guarantees: window position and other drawing parameters are unchanged
-    schedule_generate_blob(extmark, blob_id, char_pixel_height)
+    schedule_generate_blob(extmark, path, char_pixel_height)
     return nil
   end
 
@@ -192,58 +198,33 @@ function sixel_interface:_lookup_blob_by_extmark(extmark, windims, char_pixel_he
 end
 
 
----@param start_row integer
----@param end_row integer
----@param path string
-function sixel_interface:create_image(start_row, end_row, path)
-  local id = vim.api.nvim_buf_set_extmark(
-    0,
-    self.namespace,
-    start_row,
-    0,
-    { end_row=end_row }
-  )
-
-  if vim.b.image_extmark_to_blob_id == nil then
-    vim.b.image_extmark_to_blob_id = vim.empty_dict()
-  end
-
-  vim.cmd.let(("b:image_extmark_to_blob_id[%d] = '%s'"):format(
-    id,
-    vim.fn.escape(path, "'\\")
-  ))
-
-  self:draw_visible_blobs()
-end
-
-
-function sixel_interface:draw_visible_blobs()
+function sixel_interface.draw_visible_blobs()
   sixel_raw.clear_screen()
   local windims = get_windims()
 
-  local visible_extmarks = self:get_visible_extmarks(
+  local visible_extmarks = sixel_interface.get_visible_extmarks(
     windims.top_line - 1,
     windims.bottom_line - 1
   )
 
-  self:draw_blobs(visible_extmarks, windims)
+  sixel_interface.draw_blobs(visible_extmarks, windims)
 end
 
 
 ---@param extmarks (wrapped_extmark | nil)[]
 ---@param windims window_dimensions
-function sixel_interface:draw_blobs(extmarks, windims)
+function sixel_interface.draw_blobs(extmarks, windims)
   sixel_raw.clear_screen()
 
-  if vim.b.image_extmark_to_blob_id == nil then
-    vim.b.image_extmark_to_blob_id = vim.empty_dict()
+  if vim.b.image_extmark_to_path == nil then
+    vim.b.image_extmark_to_path = vim.empty_dict()
   end
 
   local char_pixel_height = sixel_raw.char_pixel_height()
 
   sixel_raw.draw_sixels(
     vim.tbl_map(
-      function(extmark) return self:_lookup_blob_by_extmark(
+      function(extmark) return sixel_interface._lookup_blob_by_extmark(
         extmark,
         windims,
         char_pixel_height
@@ -251,4 +232,142 @@ function sixel_interface:draw_blobs(extmarks, windims)
       extmarks
    )
   )
+end
+
+
+---@param start_row integer
+---@param end_row integer
+---@param path string
+---@return integer
+function sixel_interface.create_image(start_row, end_row, path)
+  local id = vim.api.nvim_buf_set_extmark(
+    0,
+    sixel_interface.namespace,
+    start_row,
+    0,
+    { end_row=end_row }
+  )
+
+  if vim.b.image_extmark_to_path == nil then
+    vim.b.image_extmark_to_path = vim.empty_dict()
+  end
+
+  vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
+    id,
+    vim.fn.escape(path, "'\\")
+  ))
+
+  sixel_interface.draw_visible_blobs()
+
+  return id
+end
+
+
+---@param start_row integer
+---@param end_row integer
+---@return image_extmark[]
+function sixel_interface.get_image_extmarks(start_row, end_row)
+  local extmarks = vim.api.nvim_buf_get_extmarks(
+    0,
+    sixel_interface.namespace,
+    start_row,
+    end_row,
+    { details=true }
+  )
+
+  return vim.tbl_map(function(extmark)
+    ---@type image_extmark
+    return {
+      id = extmark[1],
+      start_row = extmark[2],
+      end_row = extmark[4].end_row,
+      path = vim.b.image_extmark_to_path[extmark[1]]
+    }
+  end, extmarks)
+end
+
+
+---@param id integer
+function sixel_interface.remove_image_extmark(id)
+  return vim.api.nvim_buf_del_extmark(
+    0,
+    sixel_interface.namespace,
+    id
+  )
+end
+
+
+function sixel_interface.remove_images()
+  return vim.api.nvim_buf_clear_namespace(
+    0,
+    sixel_interface.namespace,
+    0,
+    -1
+  )
+end
+
+
+---@param id integer
+---@param start_row integer
+---@param end_row integer
+function sixel_interface.move_extmark(id, start_row, end_row)
+  local extmark = vim.api.nvim_buf_get_extmark_by_id(
+    0,
+    sixel_interface.namespace,
+    id,
+    {}
+  )
+  if extmark == nil then return end
+
+  vim.api.nvim_buf_set_extmark(
+    0,
+    sixel_interface.namespace,
+    start_row,
+    0,
+    { id=id, end_row=end_row }
+  )
+
+  sixel_interface.draw_visible_blobs()
+end
+
+
+---@param id integer
+---@param path string
+function sixel_interface.change_extmark_content(id, path)
+  local map = vim.b.image_extmark_to_path
+  if map == nil then return end
+
+  local extmark = vim.api.nvim_buf_get_extmark_by_id(
+    0,
+    sixel_interface.namespace,
+    id,
+    {}
+  )
+  if extmark == nil or map[tostring(id)] == nil then return end
+
+  vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
+    id,
+    vim.fn.escape(path, "'\\")
+  ))
+
+  sixel_interface.draw_visible_blobs()
+end
+
+
+---@param path (nil | string | string[])
+function sixel_interface.clear_cache(path)
+  if path == nil then
+    sixel_interface.cache = {}
+  elseif type(path) == "table" then
+    for _, path_ in ipairs(path) do
+      sixel_interface.cache[path_] = {}
+    end
+  elseif type(path) == "string" then
+    sixel_interface.cache[path] = {}
+  else
+    assert(false, "Invalid argument to clear_cache")
+  end
+
+  collectgarbage()
+  sixel_interface.draw_visible_blobs()
 end
