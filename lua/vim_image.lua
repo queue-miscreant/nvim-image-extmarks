@@ -5,13 +5,14 @@ require "vim_image/autocmds"
 ---@param start_row integer
 ---@param end_row integer
 ---@param path string
+---@return integer
 function create_image_extmark(start_row, end_row, path)
   local id = sixel_interface.create_image(start_row, end_row, path)
 
   -- Bind extmarks if we need to
   if (
     vim.b.image_extmark_to_path ~= nil and
-    vim.tbl_count(vim.b.image_extmark_to_blob_id) > 0
+    vim.tbl_count(vim.b.image_extmark_to_path) > 0
   ) then
     vim_image_callbacks.bind_autocmds()
   end

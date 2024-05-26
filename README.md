@@ -1,16 +1,14 @@
-nvim-image
-==========
+nvim-image-extmarks
+===================
 
-A plugin for drawing sixel images from nvim. Somewhat of a reimplementation of [vim-graphical-preview](https://github.com/bytesnake/vim-graphical-preview), which refused to compile on my Linux box.
+A plugin for drawing sixel images from nvim. Uses extmarks to keep track of the locations in the buffer.
+
 
 Requirements
 ------------
 
-- ImageMagick
-- LaTeX (optional)
-- Python libraries:
-    - pynvim
-    - wand (Python ImageMagick wrapper)
+- ImageMagick with support for sixel blobs
+    - Run `magick -list format | grep -i sixel` to check
 
 
 Installation
@@ -21,7 +19,7 @@ Installation
 <!--
 Place the following in `~/.config/nvim/init.vim`:
 ```vim
-Plugin '...', { 'do': ':UpdateRemotePlugins' }
+Plugin '...'
 ```
 Make sure the file is sourced and run `:PluginInstall`.
 -->
@@ -38,6 +36,7 @@ Functions
 
 Exposed functions
 
+
 Keys
 ----
 
@@ -50,19 +49,12 @@ Configuration
 Global variables
 
 
-Highlights
-----------
-
-Plugin highlights
-
-
 TODOs
 -----
 
-- Sixel cache in Lua
-- Suspend LaTeX display if cursor inside fence
-- Asynchronously draw images
-    - LaTeX update rendering currently forces all images to be available first
-    - Hold off drawing edited LaTeX if insert mode exited while cursor inside fence
-- Better error handling for multi-tool chains (LaTeX errors)
-    - Split plugin between extmark-like interface and fence-like interface?
+- Extra commands
+    - Force redraw
+    - Suspend drawing
+    - Push failure message
+- Crop thresholds
+- Pre-redraw autocmds
