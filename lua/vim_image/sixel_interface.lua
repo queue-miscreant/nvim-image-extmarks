@@ -369,5 +369,4 @@ function sixel_interface.clear_cache(path)
   end
 
   collectgarbage()
-  sixel_interface.draw_visible_blobs()
 end

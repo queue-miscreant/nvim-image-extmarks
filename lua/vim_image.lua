@@ -59,3 +59,18 @@ end
 function clear_cache(path)
   sixel_interface.clear_cache(path)
 end
+
+
+local function create_image_command(opts)
+  create_image_extmark(
+    opts.line1,
+    opts.line2,
+    opts.args
+  )
+end
+
+vim.api.nvim_create_user_command(
+  'CreateImage',
+  create_image_command,
+  { nargs = 1, range = 2, complete = "file" }
+)

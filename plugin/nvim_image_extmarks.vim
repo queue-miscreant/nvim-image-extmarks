@@ -4,3 +4,5 @@ if !has("nvim")
 endif
 
 lua require "vim_image"
+
+let g:nvim_image_extmarks_loaded = 1

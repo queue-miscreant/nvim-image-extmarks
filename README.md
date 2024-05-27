@@ -55,6 +55,8 @@ TODOs
 - Extra commands
     - Force redraw
     - Suspend drawing
+        - All images in insert mode
+        - Just those under the cursor in insert mode
     - Push failure message
 - Crop thresholds
 - Pre-redraw autocmds

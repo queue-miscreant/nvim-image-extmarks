@@ -15,12 +15,14 @@ local function extmarks_needing_update(force)
 
   -- Try getting the visible extmarks, since the cache seems valid
 
-  local extmarks = sixel_interface.get_visible_extmarks(
-    new_dims.top_line,
-    new_dims.bottom_line
+  local extmarks = vim.tbl_values(
+    sixel_interface.get_visible_extmarks(
+      new_dims.top_line,
+      new_dims.bottom_line
+    )
   )
   local new_extmark = table.concat(
-    vim.tbl_map(function(extmark) return extmark.id end, extmarks),
+    vim.tbl_map(function(extmark) return extmark.id or "" end, extmarks),
     ","
   )
 
