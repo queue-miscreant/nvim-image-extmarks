@@ -20,7 +20,7 @@ local ffi = require "ffi"
 ---@field window_column integer
 ---@field start_column integer
 
-sixel_raw = { tty=nil }
+local sixel_raw = { tty=nil }
 
 -- Ideally, this would be imported, but alas
 local TIOCGWINSZ = 0x5413
@@ -188,3 +188,5 @@ function sixel_raw.convert(
     erro = erro .. "\n" .. data
   end)
 end
+
+return sixel_raw

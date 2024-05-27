@@ -1,4 +1,4 @@
-require "vim_image/sixel_raw"
+local sixel_raw = require "vim_image/sixel_raw"
 
 ---@class image_extmark
 ---@field id integer
@@ -16,7 +16,7 @@ require "vim_image/sixel_raw"
 --      - Crop from bottom of image (i.e., number of rows removed, as a full image)
 
 pcall(sixel_raw.get_tty)
-sixel_interface = {
+local sixel_interface = {
   namespace = vim.api.nvim_create_namespace("Nvim-image"),
   cache = {},
   debounce = {}
@@ -370,3 +370,5 @@ function sixel_interface.clear_cache(path)
 
   collectgarbage()
 end
+
+return sixel_interface

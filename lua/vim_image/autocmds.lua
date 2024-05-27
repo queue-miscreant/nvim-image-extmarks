@@ -1,10 +1,10 @@
-require "vim_image/sixel_raw"
-require "vim_image/sixel_interface"
+local sixel_raw = require "vim_image/sixel_raw"
+local sixel_interface = require "vim_image/sixel_interface"
 
-vim_image_callbacks = {}
+local vim_image_callbacks = {}
 
 ---@return (wrapped_extmark | nil)[] | nil
-local function extmarks_needing_update(force)
+function vim_image_callbacks.extmarks_needing_update(force)
 
   local line_cache = vim.w.vim_image_line_cache
   local window_cache = vim.w.vim_image_window_cache
@@ -44,25 +44,4 @@ local function extmarks_needing_update(force)
   return extmarks
 end
 
-
-function vim_image_callbacks.update_extmarks(force)
-  local extmarks = extmarks_needing_update(force)
-  if extmarks == nil then return end
-
-  sixel_interface.draw_blobs(extmarks, vim.w.vim_image_window_cache)
-end
-
-
-function vim_image_callbacks.bind_autocmds()
-  vim.cmd [[
-  augroup VimImage
-    autocmd!
-    " autocmd InsertLeave <buffer> lua callbacks.update_extmarks()
-    autocmd VimEnter,VimResized,TabClosed <buffer> lua vim_image_callbacks.update_extmarks()
-    autocmd TextChanged,TextChangedI <buffer> lua vim_image_callbacks.update_extmarks()
-    autocmd TabEnter <buffer> lua vim_image_callbacks.update_extmarks(true)
-    autocmd TabLeave,ExitPre <buffer> lua sixel_raw.clear_screen()
-    autocmd CursorMoved <buffer> lua vim_image_callbacks.update_extmarks()
-  augroup END
-  ]]
-end
+return vim_image_callbacks
