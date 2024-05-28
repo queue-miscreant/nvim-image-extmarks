@@ -2,9 +2,10 @@
 --
 -- Functions providing a consistent interface to the management of sixel extmarks.
 
-local sixel_interface = require "nvim_image_extmarks/interface"
+local interface = require "nvim_image_extmarks/interface"
 local sixel_raw = require "nvim_image_extmarks/sixel_raw"
 local window_drawing = require "nvim_image_extmarks/window_drawing"
+local blob_cache = require "nvim_image_extmarks/blob_cache"
 
 ---@diagnostic disable-next-line
 sixel_extmarks = {}
@@ -31,7 +32,7 @@ end
 ---@param path string A path to the file content
 ---@return integer
 function sixel_extmarks.create(start_row, end_row, path)
-  local id = sixel_interface.create_image(start_row, end_row, path)
+  local id = interface.create_image(start_row, end_row, path)
 
   -- Bind extmarks if we need to
   if (
@@ -54,7 +55,15 @@ end
 ---@param end_row integer
 ---@return image_extmark[]
 function sixel_extmarks.get(start_row, end_row)
-  return sixel_interface.get_image_extmarks(start_row, end_row)
+  return interface.get_image_extmarks(start_row, end_row)
+end
+
+-- Retrieve an extmark in the current buffer with the given id.
+--
+---@param id integer The id of the extmark
+---@return image_extmark
+function sixel_extmarks.get_by_id(id)
+  return interface.get_image_extmark_by_id(id)
 end
 
 
@@ -63,7 +72,10 @@ end
 -- 
 ---@param id integer The id of the extmark to remove
 function sixel_extmarks.remove(id)
-  return sixel_interface.remove_image_extmark(id)
+  local ret = interface.remove_image_extmark(id)
+  window_drawing.draw_visible_blobs()
+
+  return ret
 end
 
 
@@ -72,7 +84,10 @@ end
 --
 ---@see sixel_extmarks.remove
 function sixel_extmarks.remove_all()
-  return sixel_interface.remove_images()
+  local ret = interface.remove_images()
+  window_drawing.draw_visible_blobs()
+
+  return ret
 end
 
 
@@ -84,9 +99,10 @@ end
 ---@param start_row integer
 ---@param end_row integer
 function sixel_extmarks.move(id, start_row, end_row)
-  sixel_interface.move_extmark(id, start_row, end_row)
-
+  local ret = interface.move_extmark(id, start_row, end_row)
   window_drawing.draw_visible_blobs()
+
+  return ret
 end
 
 
@@ -95,9 +111,10 @@ end
 ---@param id integer The id of the extmark to modify.
 ---@param path string The path to the file containing the new content.
 function sixel_extmarks.change_content(id, path)
-  sixel_interface.change_extmark_content(id, path)
-
+  local ret = interface.change_extmark_content(id, path)
   window_drawing.draw_visible_blobs()
+
+  return ret
 end
 
 
@@ -108,7 +125,14 @@ end
 --
 ---@param path? (string | string[])
 function sixel_extmarks.clear_cache(path)
-  sixel_interface.clear_cache(path)
+  interface.clear_cache(path)
+end
+
+
+-- Clear all content drawn to the screen. Unlike :mode in vim,
+-- this has the additional guarantee of working inside a tmux session.
+function sixel_extmarks.clear_screen()
+  sixel_raw.clear_screen()
 end
 
 
@@ -123,10 +147,32 @@ function sixel_extmarks.redraw(force)
 end
 
 
--- Clear all content drawn to the screen. Unlike :mode in vim,
--- this has the additional guarantee of working inside a tmux session.
-function sixel_extmarks.clear_screen()
-  sixel_raw.clear_screen()
+-- Disable drawing blobs.
+-- Blobs will still be generated in the background, but the contents will not
+-- be pushed to the screen.
+--
+function sixel_extmarks.disable_drawing()
+  window_drawing.disable_drawing()
+end
+
+
+-- Enable drawing blobs, after having disabled them with `disable_drawing`.
+--
+---@param redraw? boolean Whether or not to redraw the screen afterward. True if not given.
+function sixel_extmarks.enable_drawing(redraw)
+  window_drawing.enable_drawing()
+  if redraw == nil or redraw then
+    sixel_extmarks.redraw(true)
+  end
+end
+
+
+-- Generate a snapshot of the blob cache.
+-- Rather than the cache, the first two layers of keys are returned, i.e.,
+-- a table with filenames as keys and buffer ranges as values.
+--
+function sixel_extmarks.dump_blob_cache()
+  return blob_cache.dump()
 end
 
 

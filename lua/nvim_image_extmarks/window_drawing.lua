@@ -8,11 +8,20 @@ local sixel_raw = require "nvim_image_extmarks/sixel_raw"
 local interface = require "nvim_image_extmarks/interface"
 local blob_cache = require "nvim_image_extmarks/blob_cache"
 
-
 pcall(sixel_raw.get_tty)
 local window_drawing = {
-  debounce = {}
+  debounce = {},
+  enabled = true,
+  just_enabled = true
 }
+
+
+---@class window_dimensions
+---@field top_line integer
+---@field bottom_line integer
+---@field start_line integer
+---@field window_column integer
+---@field start_column integer
 
 
 ---@return window_dimensions
@@ -147,46 +156,9 @@ local function lookup_or_generate_blob(extmark, windims, char_pixel_height)
 end
 
 
----@param extmarks (wrapped_extmark | nil)[]
----@param windims window_dimensions
-function window_drawing.draw_blobs(extmarks, windims)
-  sixel_raw.clear_screen()
-
-  if vim.b.image_extmark_to_path == nil then
-    vim.b.image_extmark_to_path = vim.empty_dict()
-  end
-
-  local char_pixel_height = sixel_raw.char_pixel_height()
-
-  sixel_raw.draw_sixels(
-    vim.tbl_map(
-      function(extmark) return lookup_or_generate_blob(
-        extmark,
-        windims,
-        char_pixel_height
-      ) end,
-      extmarks
-   )
-  )
-end
-
-
-function window_drawing.draw_visible_blobs()
-  sixel_raw.clear_screen()
-  local windims = get_windims()
-
-  local visible_extmarks = window_drawing.get_visible_extmarks(
-    windims.top_line - 1,
-    windims.bottom_line - 1
-  )
-
-  window_drawing.draw_blobs(visible_extmarks, windims)
-end
-
-
 ---@return (wrapped_extmark | nil)[] | nil
 function window_drawing.extmarks_needing_update(force)
-
+  -- Get current cache
   local line_cache = vim.w.vim_image_line_cache
   local window_cache = vim.w.vim_image_window_cache
   local drawing_cache = vim.w.vim_image_extmark_cache
@@ -207,7 +179,9 @@ function window_drawing.extmarks_needing_update(force)
     ","
   )
 
-  if (
+  if window_drawing.just_enabled then
+    window_drawing.just_enabled = false
+  elseif (
     not force and
     vim.deep_equal(new_dims, window_cache) and -- Window has not moved
     line_cache == vim.fn.line("$") and -- No lines have been added
@@ -223,6 +197,64 @@ function window_drawing.extmarks_needing_update(force)
   vim.w.vim_image_line_cache = new_line
 
   return extmarks
+end
+
+
+---@param extmarks (wrapped_extmark | nil)[]
+---@param windims window_dimensions
+function window_drawing.draw_blobs(extmarks, windims)
+  if window_drawing.enabled then
+    sixel_raw.clear_screen()
+  end
+
+  if vim.b.image_extmark_to_path == nil then
+    vim.b.image_extmark_to_path = vim.empty_dict()
+  end
+
+  local char_pixel_height = sixel_raw.char_pixel_height()
+
+  local blobs = vim.tbl_map(
+    function(extmark) return lookup_or_generate_blob(
+      extmark,
+      windims,
+      char_pixel_height
+    ) end,
+    extmarks
+  )
+
+  if window_drawing.enabled then
+    sixel_raw.draw_sixels(blobs)
+  end
+end
+
+
+function window_drawing.draw_visible_blobs()
+  local windims = get_windims()
+
+  local visible_extmarks = window_drawing.get_visible_extmarks(
+    windims.top_line - 1,
+    windims.bottom_line - 1
+  )
+
+  window_drawing.draw_blobs(visible_extmarks, windims)
+end
+
+
+-- Disable drawing blobs.
+-- Blobs will still be generated in the background, but the contents will not
+-- be pushed to the screen.
+--
+function window_drawing.disable_drawing()
+  window_drawing.enabled = false
+  window_drawing.just_enabled = false
+end
+
+
+-- Enable drawing blobs, after having disabled them with `disable_drawing`.
+--
+function window_drawing.enable_drawing()
+  window_drawing.enabled = true
+  window_drawing.just_enabled = true
 end
 
 return window_drawing

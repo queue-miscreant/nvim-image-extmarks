@@ -39,7 +39,7 @@ TMUX                                                    *nvim-sixel-extmarks-tmu
         to "refresh" the content in the session by quickly detaching and
         attaching. With enough delay, this produces visible artifacts,
         including:
-                
+
             - boxes of "+" characters where the images would be displayed
             - sixel binary content, which appears as random ASCII characters
 
@@ -88,6 +88,13 @@ sixel_extmarks.get(
             end_row:    An integer; the row that the extmark ends on.
             path:       A string, which is a path.
 
+
+                                                        *sixel_extmarks.get_by_id*
+sixel_extmarks.get_by_id({id}: integer)
+
+        Retrieve an extmark in the current buffer with the given id.
+
+
                                                         *sixel_extmarks.remove*
 sixel_extmarks.remove({id}: integer)
 
@@ -130,14 +137,7 @@ sixel_extmarks.clear_cache({paths}: string[])
         for that file are removed.
 
         If {paths}, a list of strings are supplied, then all blobs for those
-        files in the list are removed. 
-
-
-                                                        *sixel_extmarks.clear_screen*
-sixel_extmarks.redraw()
-sixel_extmarks.redraw({force}: boolean)
-
-        Clear the screen and redraw the currently displayed content.
+        files in the list are removed.
 
 
                                                         *sixel_extmarks.clear_screen*
@@ -146,6 +146,41 @@ sixel_extmarks.clear_screen()
         Clear all content drawn to the screen. Unlike |:mode|, this has the
         additional guarantee of working inside a tmux session.
         See also |nvim-sixel-extmarks-tmux|.
+
+
+                                                        *sixel_extmarks.redraw*
+sixel_extmarks.redraw()
+sixel_extmarks.redraw({force}: boolean)
+
+        Clear the screen and redraw the currently displayed content.
+
+
+                                                        *sixel_extmarks.disable_drawing*
+sixel_extmarks.disable_drawing()
+
+        Disable drawing blobs.
+
+        Blobs will still be generated in the background, but the contents will not
+        be pushed to the screen.
+
+
+                                                        *sixel_extmarks.enable_drawing*
+sixel_extmarks.enable_drawing()
+sixel_extmarks.enable_drawing({redraw}: boolean)
+
+        Enable drawing blobs, after having disabled them with
+        |sixel_extmarks.disable_drawing|.
+
+        If called with no arguments or {redraw} is true, the screen is
+        redrawn, as if with `sixel_extmarks.redraw(true)`.
+
+
+                                                        *sixel_extmarks.dump_blob_cache*
+sixel_extmarks.dump_blob_cache()
+
+        Generate a snapshot of the blob cache.
+        Rather than the cache, the first two layers of keys are returned, i.e.,
+        a table with filenames as keys and buffer ranges as values.
 
 
 --------------------------------------------------------------------------------

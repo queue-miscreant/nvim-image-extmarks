@@ -74,4 +74,25 @@ function blob_cache.clear(path)
 end
 
 
+function blob_cache.dump()
+  return vim.tbl_map(
+    function(x)
+      return vim.tbl_map(
+        ---@param y string
+        function(y)
+          local height, crop_row_start, crop_row_end = y:match("(%d),(%d),(%d)")
+          return {
+            height = height,
+            crop_row_start = crop_row_start,
+            crop_row_end = crop_row_end
+          }
+        end,
+        vim.tbl_keys(x)
+      )
+    end,
+    blob_cache.contents
+  )
+end
+
+
 return blob_cache

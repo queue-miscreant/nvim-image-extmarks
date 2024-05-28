@@ -13,13 +13,6 @@ local ffi = require "ffi"
 ---@field crop_row_start integer
 ---@field crop_row_end integer
 
----@class window_dimensions
----@field top_line integer
----@field bottom_line integer
----@field start_line integer
----@field window_column integer
----@field start_column integer
-
 local sixel_raw = { tty=nil }
 
 -- Ideally, this would be imported, but alas

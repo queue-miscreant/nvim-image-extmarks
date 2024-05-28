@@ -18,7 +18,7 @@ Requirements
 ------------
 
 - A terminal emulator that can display sixels
-    - A good resource to check is [Are We Sixel Yet?](https://www.arewesixelyet.com/)
+    - See [here](https://www.arewesixelyet.com/)
 - ImageMagick with support for sixel blobs
     - Run `magick -list format | grep -i sixel` to check
 
@@ -80,6 +80,16 @@ The return value is a list of tables with the following structure:
 |`end_row`    | integer    | The (0-indexed) row that the extmark ends on    |
 |`path`       | string     | A path to the current content                   |
 
+
+### sixel\_extmarks.get\_by\_id
+
+`sixel_extmarks.get_by_id(id: integer)`
+
+Retrieve an extmark in the current buffer with the given id.
+Returns a table which is structured the same as the entries of the return type
+of `sixel_extmarks.get`.
+
+
 ### sixel\_extmarks.remove
 
 `sixel_extmarks.remove(id: integer)`
@@ -126,7 +136,15 @@ If `path`, a single string argument is supplied, then only the blobs
 for that file are removed.
 
 If `paths`, a list of strings are supplied, then all blobs for those
-files in the list are removed. 
+files in the list are removed.
+
+
+### sixel\_extmarks.clear\_screen
+
+`sixel_extmarks.clear_screen()`
+
+Clear all content drawn to the screen. Unlike `:mode`, this has the
+additional guarantee of working inside a tmux session.
 
 
 ### sixel\_extmarks.redraw
@@ -137,12 +155,30 @@ files in the list are removed.
 Clear the screen and redraw the currently displayed content.
 
 
-### sixel\_extmarks.clear\_screen
+### sixel\_extmarks.disable\_drawing
 
-`sixel_extmarks.clear_screen()`
+`sixel_extmarks.disable_drawing()`
 
-Clear all content drawn to the screen. Unlike `:mode`, this has the
-additional guarantee of working inside a tmux session.
+Disable drawing blobs.
+
+Blobs will still be generated in the background, but the contents will not
+be pushed to the screen.
+
+
+### sixel\_extmarks.enable\_drawing
+
+`sixel_extmarks.enable_drawing()`
+
+Enable drawing blobs, after having disabled them with `disable_drawing`.
+
+
+### sixel\_extmarks.dump\_blob\_cache
+
+`sixel_extmarks.dump_blob_cache()`
+
+Generate a snapshot of the blob cache.
+Rather than the cache, the first two layers of keys are returned, i.e.,
+a table with filenames as keys and buffer ranges as values.
 
 
 Configuration
@@ -159,6 +195,6 @@ TODOs
         - All images in insert mode
         - Just those under the cursor in insert mode
     - Push failure message to extmark
-- Buffering redraws until the cursor stays still enough
+- Buffer redraws until the cache parameters (line count, window dimensions, extmark numbers) stay still
 - Crop thresholds
 - Pre-redraw autocmds

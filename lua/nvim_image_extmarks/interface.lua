@@ -32,12 +32,41 @@ function interface.create_image(start_row, end_row, path)
     vim.b.image_extmark_to_path = vim.empty_dict()
   end
 
+  vim.print(vim.b.image_extmark_to_path)
   vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
     id,
     vim.fn.escape(path, "'\\")
   ))
 
   return id
+end
+
+
+-- Convert extmark from nvim_buf_get_extmark{_by_id,s} to idiomatic form
+--
+---@param extmark [integer, integer, integer, {end_row: integer}]
+---@return image_extmark
+local function convert_extmark(extmark)
+    return {
+      id = extmark[1],
+      start_row = extmark[2],
+      end_row = extmark[4].end_row,
+      path = vim.b.image_extmark_to_path[tostring(extmark[1])]
+    }
+end
+
+
+---@param id integer
+---@return image_extmark
+function interface.get_image_extmark_by_id(id)
+  local extmarks = vim.api.nvim_buf_get_extmark_by_id(
+    0,
+    interface.namespace,
+    id,
+    { details=true }
+  )
+
+  return convert_extmark(extmarks)
 end
 
 
@@ -53,20 +82,14 @@ function interface.get_image_extmarks(start_row, end_row)
     { details=true }
   )
 
-  return vim.tbl_map(function(extmark)
-    ---@type image_extmark
-    return {
-      id = extmark[1],
-      start_row = extmark[2],
-      end_row = extmark[4].end_row,
-      path = vim.b.image_extmark_to_path[extmark[1]]
-    }
-  end, extmarks)
+  return vim.tbl_map(convert_extmark, extmarks)
 end
 
 
 ---@param id integer
 function interface.remove_image_extmark(id)
+  vim.b.image_extmark_to_path[tostring(id)] = nil
+
   return vim.api.nvim_buf_del_extmark(
     0,
     interface.namespace,
@@ -76,6 +99,7 @@ end
 
 
 function interface.remove_images()
+  vim.b.image_extmark_to_path = vim.empty_dict()
   return vim.api.nvim_buf_clear_namespace(
     0,
     interface.namespace,
