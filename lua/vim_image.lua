@@ -1,19 +1,24 @@
-local sixel_interface = require "vim_image/sixel_interface"
-local sixel_raw = require "vim_image/sixel_raw"
-local callbacks = require "vim_image/autocmds"
+-- nvim_image_extmarks.lua
+--
+-- Functions providing a consistent interface to the management of sixel extmarks.
 
-sixel_extmarks = { callbacks = {} }
+local sixel_interface = require "vim_image/interface"
+local sixel_raw = require "vim_image/sixel_raw"
+local window_drawing = require "vim_image/window_drawing"
+
+---@diagnostic disable-next-line
+sixel_extmarks = {}
 
 
 local function bind_autocmds()
   vim.cmd [[
   augroup VimImage
     autocmd!
-    autocmd VimEnter,VimResized,TabClosed <buffer> lua sixel_extmarks.callbacks.update()
-    autocmd TextChanged,TextChangedI <buffer> lua sixel_extmarks.callbacks.update()
-    autocmd TabEnter <buffer> lua sixel_extmarks.callbacks.update(true)
+    autocmd VimEnter,VimResized,TabClosed <buffer> lua sixel_extmarks.redraw()
+    autocmd TextChanged,TextChangedI <buffer> lua sixel_extmarks.redraw()
+    autocmd TabEnter <buffer> lua sixel_extmarks.redraw(true)
     autocmd TabLeave,ExitPre <buffer> lua sixel_extmarks.clear_screen()
-    autocmd CursorMoved <buffer> lua sixel_extmarks.callbacks.update()
+    autocmd CursorMoved <buffer> lua sixel_extmarks.redraw()
   augroup END
   ]]
 end
@@ -35,6 +40,8 @@ function sixel_extmarks.create(start_row, end_row, path)
   ) then
     bind_autocmds()
   end
+
+  window_drawing.draw_visible_blobs()
 
   return id
 end
@@ -78,6 +85,8 @@ end
 ---@param end_row integer
 function sixel_extmarks.move(id, start_row, end_row)
   sixel_interface.move_extmark(id, start_row, end_row)
+
+  window_drawing.draw_visible_blobs()
 end
 
 
@@ -87,6 +96,8 @@ end
 ---@param path string The path to the file containing the new content.
 function sixel_extmarks.change_content(id, path)
   sixel_interface.change_extmark_content(id, path)
+
+  window_drawing.draw_visible_blobs()
 end
 
 
@@ -104,11 +115,11 @@ end
 -- Draw all extmark content on the screen.
 --
 ---@param force boolean Force redraw
-function sixel_extmarks.callbacks.update(force)
-  local extmarks = callbacks.extmarks_needing_update(force)
+function sixel_extmarks.redraw(force)
+  local extmarks = window_drawing.extmarks_needing_update(force)
   if extmarks == nil then return end
 
-  sixel_interface.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+  window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
 end
 
 

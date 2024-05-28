@@ -38,6 +38,7 @@ int ioctl(int fd, int cmd, ...);
 
 
 -- Perform the above ioctl operation and calculate the height of a character in pixels
+--
 ---@return number
 function sixel_raw.char_pixel_height()
   local buf = ffi.new("struct winsize")
@@ -62,6 +63,7 @@ end
 
 -- Draw a sixel to the display
 -- Move the cursor to (row, column) (1-indexed), draw the blob, then reset the cursor position
+--
 ---@param blob string
 ---@param winpos [integer, integer]
 function sixel_raw.draw_sixel(blob, winpos)
@@ -117,25 +119,12 @@ function sixel_raw.clear_screen()
   end
 end
 
----@return window_dimensions
-function sixel_raw.get_windims()
-  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
-
-  return {
-      top_line = wininfo[1].topline,
-      bottom_line = wininfo[1].botline,
-      start_line = wininfo[1].winrow,
-      window_column = wininfo[1].wincol,
-      start_column = wininfo[1].textoff,
-  }
-end
-
 
 ---@param extmark wrapped_extmark
 ---@param blob_id string
 ---@param char_pixel_height integer
 ---@param callback function(string): any
-function sixel_raw.convert(
+function sixel_raw.blobify(
   extmark,
   blob_id,
   char_pixel_height,

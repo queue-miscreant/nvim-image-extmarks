@@ -47,7 +47,7 @@ specified. This wraps `sixel_extmarks.create` below.
 Lua Functions
 -------------
 
-### `sixel_extmarks.create`
+### sixel\_extmarks.create
 
 `sixel_extmarks.create(
   start_row: integer,
@@ -60,7 +60,7 @@ Create a new image extmark which stretches from (0-indexed) row
 from the file at `path`.
 
 
-### `sixel_extmarks.get`
+### sixel\_extmarks.get
 
 `sixel_extmarks.get(
   start_row: integer,
@@ -71,16 +71,16 @@ Retrieve a list of image extmarks in the current buffer between
 (0-indexed) rows `start_row` and `end_row`.
 To get all extmarks, set `start_row` to 0 and `end_row` to -1.
 
-The return value is a table with the following the structure:
+The return value is a list of tables with the following structure:
 
+| Field       | Type       | Description                                     |
 |-------------|------------|-------------------------------------------------|
 |`id`         | integer    | The id of the extmark                           |
 |`start_row`  | integer    | The (0-indexed) row that the extmark starts on  |
 |`end_row`    | integer    | The (0-indexed) row that the extmark ends on    |
 |`path`       | string     | A path to the current content                   |
-|-------------|------------|-------------------------------------------------|
 
-### `sixel_extmarks.remove`
+### sixel\_extmarks.remove
 
 `sixel_extmarks.remove(id: integer)`
 
@@ -88,7 +88,7 @@ Delete the extmark in the current buffer identified by `id`. This does NOT free
 from the cache any of the blobs generated from the file the extmark points to.
 
 
-### `sixel_extmarks.remove_all`
+### sixel\_extmarks.remove\_all
 
 `sixel_extmarks.remove_all()`
 
@@ -96,7 +96,7 @@ Delete all extmarks in the current buffer. The same caveat about the
 cache applies here as well.
 
 
-### `sixel_extmarks.move`
+### sixel\_extmarks.move
 
 `sixel_extmarks.move(id: integer, start_row: integer, end_row: integer)`
 
@@ -105,7 +105,7 @@ starting at row `start_row` of the buffer and ends at `end_row`.
 Be aware that this can resize the image.
 
 
-### `sixel_extmarks.change_content`
+### sixel\_extmarks.change\_content
 
 `sixel_extmarks.change_content(id: integer, path: string)`
 
@@ -113,7 +113,7 @@ Change the content of the extmark identified by `id` to the file at
 `path`.
 
 
-### `sixel_extmarks.clear_cache`
+### sixel\_extmarks.clear\_cache
 
 `sixel_extmarks.clear_cache()`
 `sixel_extmarks.clear_cache(path: string)`
@@ -129,7 +129,15 @@ If `paths`, a list of strings are supplied, then all blobs for those
 files in the list are removed. 
 
 
-### `sixel_extmarks.clear_screen`
+### sixel\_extmarks.redraw
+
+`sixel_extmarks.redraw()`
+`sixel_extmarks.redraw(force: boolean)`
+
+Clear the screen and redraw the currently displayed content.
+
+
+### sixel\_extmarks.clear\_screen
 
 `sixel_extmarks.clear_screen()`
 
@@ -146,13 +154,11 @@ None yet
 TODOs
 -----
 
-- Documentation
 - Extra commands
-    - Force redraw
     - Suspend drawing
         - All images in insert mode
         - Just those under the cursor in insert mode
-    - Push failure message
+    - Push failure message to extmark
 - Buffering redraws until the cursor stays still enough
 - Crop thresholds
 - Pre-redraw autocmds

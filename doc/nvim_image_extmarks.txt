@@ -134,6 +134,13 @@ sixel_extmarks.clear_cache({paths}: string[])
 
 
                                                         *sixel_extmarks.clear_screen*
+sixel_extmarks.redraw()
+sixel_extmarks.redraw({force}: boolean)
+
+        Clear the screen and redraw the currently displayed content.
+
+
+                                                        *sixel_extmarks.clear_screen*
 sixel_extmarks.clear_screen()
 
         Clear all content drawn to the screen. Unlike |:mode|, this has the
