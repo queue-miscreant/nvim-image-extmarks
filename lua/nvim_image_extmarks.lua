@@ -2,9 +2,9 @@
 --
 -- Functions providing a consistent interface to the management of sixel extmarks.
 
-local sixel_interface = require "vim_image/interface"
-local sixel_raw = require "vim_image/sixel_raw"
-local window_drawing = require "vim_image/window_drawing"
+local sixel_interface = require "nvim_image_extmarks/interface"
+local sixel_raw = require "nvim_image_extmarks/sixel_raw"
+local window_drawing = require "nvim_image_extmarks/window_drawing"
 
 ---@diagnostic disable-next-line
 sixel_extmarks = {}

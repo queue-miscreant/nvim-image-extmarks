@@ -1,6 +1,12 @@
-local sixel_raw = require "vim_image/sixel_raw"
-local interface = require "vim_image/interface"
-local blob_cache = require "vim_image/blob_cache"
+-- nvim_image_extmarks/sixel_raw.lua
+--
+-- "Low-level" sixel drawing functions, such as drawing blobs to the tty, clearing
+-- the screen safely, and getting the character height for drawing.
+
+
+local sixel_raw = require "nvim_image_extmarks/sixel_raw"
+local interface = require "nvim_image_extmarks/interface"
+local blob_cache = require "nvim_image_extmarks/blob_cache"
 
 
 pcall(sixel_raw.get_tty)

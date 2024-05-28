@@ -1,7 +1,7 @@
--- sixel_raw.lua
+-- nvim_image_extmarks/sixel_raw.lua
 --
--- "Low-level" sixel drawing functions, such as drawing blobs to the tty, clearing
--- the screen safely, and getting the character height for drawing.
+-- "Low-level" sixel functions, such as creating blobs, drawing them to the tty,
+-- clearing the screen safely, and getting the character height for drawing.
 
 local ffi = require "ffi"
 
@@ -109,6 +109,7 @@ end
 
 -- Clear the screen of all sixel characters
 -- This should also work in tmux, where sixel images can appear "sticky"
+--
 function sixel_raw.clear_screen()
   -- clear screen with :mode
   vim.cmd("mode")
@@ -120,13 +121,16 @@ function sixel_raw.clear_screen()
 end
 
 
----@param extmark wrapped_extmark
----@param blob_id string
----@param char_pixel_height integer
----@param callback function(string): any
+-- Convert extmark parameters into a sixel blob by starting an ImageMagick subprocess.
+--
+---@param extmark wrapped_extmark A wrapped extmark, containing height and crop data (in rows)
+---@param filepath string A path to a file, from which the image blob is generated
+---@param char_pixel_height integer Height of a row of the terminal, in pixels
+---@param callback fun(blob: string): any A callback function which is called with the generated blob
+---@param error_callback? fun(errors: string): any An optional callback function, called with error information
 function sixel_raw.blobify(
   extmark,
-  blob_id,
+  filepath,
   char_pixel_height,
   callback,
   error_callback
@@ -143,7 +147,7 @@ function sixel_raw.blobify(
   local stderr = vim.loop.new_pipe()
   vim.loop.spawn("convert", {
     args = {
-      vim.fs.normalize(blob_id) .. "[0]",
+      vim.fs.normalize(filepath) .. "[0]",
       "(",
       "+resize",
       resize,

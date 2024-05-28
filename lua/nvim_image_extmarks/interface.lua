@@ -1,3 +1,9 @@
+-- nvim_image_extmarks/interface.lua
+--
+-- Functions which wrap nvim's native extmark interface.
+-- They are generally "dumber" than the functions exposed to the user, and
+-- are focused primarily on buffer-local storage of extmark and file data.
+
 ---@class image_extmark
 ---@field id integer
 ---@field start_row integer

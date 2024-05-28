@@ -1,16 +1,16 @@
-local sixel_raw = require "vim_image/sixel_raw"
-
-local blob_cache = { contents = {} }
-
-
+-- nvim_image_extmarks/blob_cache.lua
+--
+-- A naive two-layer cache for sixel blobs.
 -- Blobs are cached by the following characteristics:
 --
--- - Layer 1:
+-- - Layer 1 keys:
 --      - Content hash
--- - Layer 2:
+-- - Layer 2 keys:
 --      - Height, in rows
 --      - Crop from top of image, in rows
 --      - Crop from bottom of image (i.e., number of rows removed, as a full image)
+
+local blob_cache = { contents = {} }
 
 
 ---@param extmark wrapped_extmark

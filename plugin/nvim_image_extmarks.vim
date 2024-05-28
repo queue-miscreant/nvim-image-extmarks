@@ -3,6 +3,6 @@ if !has("nvim")
   finish
 endif
 
-lua require "vim_image"
+lua require "nvim_image_extmarks"
 
 let g:nvim_image_extmarks_loaded = 1
