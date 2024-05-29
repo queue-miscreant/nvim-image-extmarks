@@ -184,7 +184,12 @@ a table with filenames as keys and buffer ranges as values.
 Configuration
 -------------
 
-None yet
+### g:image\_extmarks\_buffer\_ms
+
+Controls the amount of delay, in milliseconds, between the screen being cleared
+and extmarks being redrawn.
+If multiple redraws occur in quick succession, then this can prevent
+flashing due to the screen clearing and redrawing.
 
 
 TODOs
@@ -195,6 +200,5 @@ TODOs
         - All images in insert mode
         - Just those under the cursor in insert mode
     - Push failure message to extmark
-- Buffer redraws until the cache parameters (line count, window dimensions, extmark numbers) stay still
 - Crop thresholds
 - Pre-redraw autocmds

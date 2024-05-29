@@ -13,7 +13,10 @@ local ffi = require "ffi"
 ---@field crop_row_start integer
 ---@field crop_row_end integer
 
-local sixel_raw = { tty=nil }
+local sixel_raw = {
+  tty = nil,
+  screen_cleared = true
+}
 
 -- Ideally, this would be imported, but alas
 local TIOCGWINSZ = 0x5413
@@ -72,6 +75,8 @@ function sixel_raw.draw_sixel(blob, winpos)
     stdout:write("\x1b[u")
     stdout:close()
   end)
+
+  sixel_raw.screen_cleared = false
 end
 
 
@@ -97,6 +102,8 @@ function sixel_raw.draw_sixels(blob_ranges)
     stdout:write("\x1b[u")
     stdout:close()
   end)
+
+  sixel_raw.screen_cleared = false
 end
 
 
@@ -104,6 +111,7 @@ end
 -- This should also work in tmux, where sixel images can appear "sticky"
 --
 function sixel_raw.clear_screen()
+  if sixel_raw.screen_cleared then return end
   -- clear screen with :mode
   vim.cmd("mode")
   -- clear tmux with tmux detach -E "tmux attach -t (session number)"

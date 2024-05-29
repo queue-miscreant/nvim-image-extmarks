@@ -186,7 +186,13 @@ sixel_extmarks.dump_blob_cache()
 --------------------------------------------------------------------------------
 CONFIGURATION                                           *nvim-sixel-extmarks-configuration*
 
-None currently.
+
+g:image_extmarks_buffer_ms                              *g:image_extmarks_buffer_ms*
+
+        Controls the amount of delay, in milliseconds, between the screen
+        being cleared and extmarks being redrawn. If multiple redraws occur in
+        quick succession, then this can prevent flashing due to the screen
+        clearing and redrawing.
 
 ================================================================================
 vim:tw=80:nosta:ft=help:fen:

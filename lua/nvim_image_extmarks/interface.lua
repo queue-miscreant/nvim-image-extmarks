@@ -32,7 +32,6 @@ function interface.create_image(start_row, end_row, path)
     vim.b.image_extmark_to_path = vim.empty_dict()
   end
 
-  vim.print(vim.b.image_extmark_to_path)
   vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
     id,
     vim.fn.escape(path, "'\\")

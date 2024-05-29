@@ -7,6 +7,15 @@ local sixel_raw = require "nvim_image_extmarks/sixel_raw"
 local window_drawing = require "nvim_image_extmarks/window_drawing"
 local blob_cache = require "nvim_image_extmarks/blob_cache"
 
+local extmark_timer = nil
+assert(
+  (
+    type(vim.g.image_extmarks_buffer_ms) == "number" or
+    type(vim.g.image_extmarks_buffer_ms) == "nil"
+  ),
+  "g:image_extmarks_buffer_ms must be a number"
+)
+
 ---@diagnostic disable-next-line
 sixel_extmarks = {}
 
@@ -143,7 +152,27 @@ function sixel_extmarks.redraw(force)
   local extmarks = window_drawing.extmarks_needing_update(force)
   if extmarks == nil then return end
 
-  window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+  if vim.g.image_extmarks_buffer_ms == nil then
+    window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+    return
+  -- "Renew" the timer by cancelling it first
+  elseif extmark_timer ~= nil then
+    pcall(function()
+      extmark_timer:stop()
+      extmark_timer:close()
+    end)
+  end
+  sixel_raw.clear_screen()
+  extmark_timer = vim.loop.new_timer()
+  extmark_timer:start(
+    vim.g.image_extmarks_buffer_ms,
+    0,
+    vim.schedule_wrap(function()
+      extmark_timer:stop()
+      extmark_timer:close()
+      window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+    end)
+  )
 end
 
 

@@ -1,7 +1,6 @@
--- nvim_image_extmarks/sixel_raw.lua
+-- nvim_image_extmarks/window_drawing.lua
 --
--- "Low-level" sixel drawing functions, such as drawing blobs to the tty, clearing
--- the screen safely, and getting the character height for drawing.
+-- Sixel drawing functionality, relative to the current window state.
 
 
 local sixel_raw = require "nvim_image_extmarks/sixel_raw"
