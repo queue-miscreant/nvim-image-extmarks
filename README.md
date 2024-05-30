@@ -192,6 +192,15 @@ If multiple redraws occur in quick succession, then this can prevent
 flashing due to the screen clearing and redrawing.
 
 
+### g:image\_extmarks\_slow\_insert
+
+Activates "slow" insert mode.
+
+Instead of attempting to redraw images as-necessary in insert mode, drawing is
+disabled when entering insert mode and a redraw is invoked upon exiting insert
+mode.
+
+
 Autocmds
 --------
 
@@ -204,6 +213,8 @@ These include:
     - Force redraw
 - `TabLeave`, `ExitPre`
     - Clear the screen of all sixel images
+- `InsertEnter`, `InsertLeave`
+    - See `g:image_extmarks_slow_insert`
 
 These attempt to replicate the feel of normal text extmarks without extra
 configuration. They can be overridden or unbound at your leisure using
@@ -219,9 +230,5 @@ before drawing sixel blobs.
 TODOs
 -----
 
-- Extra commands
-    - Suspend drawing
-        - All images in insert mode
-        - Just those under the cursor in insert mode
-    - Push failure message to extmark
+- Push failure messages to extmark
 - Crop thresholds

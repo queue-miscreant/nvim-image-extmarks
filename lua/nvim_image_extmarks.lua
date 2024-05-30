@@ -16,6 +16,7 @@ assert(
   "g:image_extmarks_buffer_ms must be a number"
 )
 vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
+vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
 
 
 ---@diagnostic disable-next-line
@@ -23,15 +24,46 @@ sixel_extmarks = {}
 
 
 local function bind_autocmds()
-  vim.cmd [[
-  augroup ImageExtmarks
-    autocmd!
-    autocmd TabClosed,TextChanged,TextChangedI <buffer> lua sixel_extmarks.redraw()
-    autocmd VimEnter,VimResized,TabEnter <buffer> lua sixel_extmarks.redraw(true)
-    autocmd TabLeave,ExitPre <buffer> lua sixel_extmarks.clear_screen()
-    autocmd CursorMoved <buffer> lua sixel_extmarks.redraw()
-  augroup END
-  ]]
+  vim.api.nvim_create_autocmd({ "TabClosed", "CursorMoved", "TextChanged", "TextChangedI" }, {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function() sixel_extmarks.redraw() end
+  })
+  vim.api.nvim_create_autocmd({ "VimEnter", "VimResized", "TabEnter" }, {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function() sixel_extmarks.redraw(true) end
+  })
+  vim.api.nvim_create_autocmd({ "TabLeave", "ExitPre" }, {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function() sixel_extmarks.clear_screen() end
+  })
+
+  vim.api.nvim_create_autocmd("InsertEnter", {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function()
+      if not vim.g.image_extmarks_slow_insert then
+        return
+      end
+
+      window_drawing.disable_drawing()
+      sixel_raw.clear_screen()
+    end
+  })
+
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function()
+      if not vim.g.image_extmarks_slow_insert then
+        return
+      end
+
+      window_drawing.enable_drawing()
+    end
+  })
 end
 
 
@@ -148,7 +180,7 @@ end
 
 -- Draw all extmark content on the screen.
 --
----@param force boolean Force redraw
+---@param force? boolean Force redraw
 function sixel_extmarks.redraw(force)
   local extmarks = window_drawing.extmarks_needing_update(force)
   if extmarks == nil then return end
