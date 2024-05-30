@@ -15,6 +15,8 @@ assert(
   ),
   "g:image_extmarks_buffer_ms must be a number"
 )
+vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
+
 
 ---@diagnostic disable-next-line
 sixel_extmarks = {}
@@ -22,11 +24,10 @@ sixel_extmarks = {}
 
 local function bind_autocmds()
   vim.cmd [[
-  augroup VimImage
+  augroup ImageExtmarks
     autocmd!
-    autocmd VimEnter,VimResized,TabClosed <buffer> lua sixel_extmarks.redraw()
-    autocmd TextChanged,TextChangedI <buffer> lua sixel_extmarks.redraw()
-    autocmd TabEnter <buffer> lua sixel_extmarks.redraw(true)
+    autocmd TabClosed,TextChanged,TextChangedI <buffer> lua sixel_extmarks.redraw()
+    autocmd VimEnter,VimResized,TabEnter <buffer> lua sixel_extmarks.redraw(true)
     autocmd TabLeave,ExitPre <buffer> lua sixel_extmarks.clear_screen()
     autocmd CursorMoved <buffer> lua sixel_extmarks.redraw()
   augroup END

@@ -192,6 +192,30 @@ If multiple redraws occur in quick succession, then this can prevent
 flashing due to the screen clearing and redrawing.
 
 
+Autocmds
+--------
+
+`autocmd`s which are used by the plugin live under the group `ImageExtmarks`.
+These include:
+
+- `TabClosed`, `TextChanged`, `TextChangedI`, `CursorMoved`
+    - Attempt to redraw, if necessary
+- `VimEnter`, `VimResized`, `TabEnter`
+    - Force redraw
+- `TabLeave`, `ExitPre`
+    - Clear the screen of all sixel images
+
+These attempt to replicate the feel of normal text extmarks without extra
+configuration. They can be overridden or unbound at your leisure using
+`autocmd!`.
+
+
+### Events
+
+`User`-type `autocmd`s are fired under the `ImageExtmarks#pre_draw` immediately
+before drawing sixel blobs.
+
+
 TODOs
 -----
 
@@ -201,4 +225,3 @@ TODOs
         - Just those under the cursor in insert mode
     - Push failure message to extmark
 - Crop thresholds
-- Pre-redraw autocmds

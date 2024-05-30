@@ -67,10 +67,13 @@ end
 ---@param path string
 ---@param char_pixel_height integer
 local function schedule_generate_blob(extmark, path, char_pixel_height)
-  if window_drawing.debounce[tostring(extmark.id)] ~= nil then
-    return
+  local draw_number = window_drawing.debounce[tostring(extmark.id)]
+  if draw_number == nil then
+    draw_number = 0
+  else
+    draw_number = draw_number + 1
   end
-  window_drawing.debounce[tostring(extmark.id)] = true
+  window_drawing.debounce[tostring(extmark.id)] = draw_number
 
   sixel_raw.blobify(
     extmark,
@@ -78,6 +81,15 @@ local function schedule_generate_blob(extmark, path, char_pixel_height)
     char_pixel_height,
     function(blob)
       vim.defer_fn(function()
+        if draw_number ~= window_drawing.debounce[tostring(extmark.id)] then
+          return
+        end
+
+        vim.api.nvim_exec_autocmds("User", {
+          group="ImageExtmarks#pre_draw",
+          data={ extmark }
+        })
+
         window_drawing.cache_and_draw_blob(blob, path, extmark)
         window_drawing.debounce[tostring(extmark.id)] = nil
       end, 0)
@@ -90,7 +102,13 @@ end
 ---@param bottom_line integer The last line of the currently-displayed window
 ---@return (wrapped_extmark | nil)[]
 function window_drawing.get_visible_extmarks(top_line, bottom_line)
-  local extmarks = vim.api.nvim_buf_get_extmarks(0, interface.namespace, 0, -1, { details=true })
+  local extmarks = vim.api.nvim_buf_get_extmarks(
+    0,
+    interface.namespace,
+    0,
+    -1,
+    { details=true }
+  )
   local cursor_row = vim.fn.line(".")
 
   return vim.tbl_map(function(extmark)
@@ -222,6 +240,10 @@ function window_drawing.draw_blobs(extmarks, windims)
   )
 
   if window_drawing.enabled then
+    vim.api.nvim_exec_autocmds("User", {
+      group="ImageExtmarks#pre_draw",
+      data=extmarks
+    })
     sixel_raw.draw_sixels(blobs)
   end
 end

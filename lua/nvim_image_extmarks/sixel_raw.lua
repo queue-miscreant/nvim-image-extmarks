@@ -119,6 +119,7 @@ function sixel_raw.clear_screen()
   if tmux_session ~= nil then
     vim.fn.system(("tmux detach -E 'tmux attach -t %s'"):format(tmux_session))
   end
+  sixel_raw.screen_cleared = true
 end
 
 

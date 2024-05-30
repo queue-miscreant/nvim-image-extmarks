@@ -1,7 +1,7 @@
-*nvim_sixel_extmarks.txt*                                 Image extmarks
+*nvim_image_extmarks.txt*                                 Image extmarks
 
 ================================================================================
-INTRODUCTION                                            *nvim-sixel-extmarks-introduction*
+INTRODUCTION                                            *nvim-image-extmarks-introduction*
 
         An extension to nvim's extmarks which supports sixel image content.
 
@@ -18,7 +18,7 @@ INTRODUCTION                                            *nvim-sixel-extmarks-int
         to see if your intsallation supports sixels.
 
 
-CACHE                                                   *nvim-sixel-extmarks-cache*
+CACHE                                                   *nvim-image-extmarks-cache*
 
         All generated sixels are cached locally (in Lua state) to improve
         performance. If the file changes in the filesystem, it will be
@@ -28,7 +28,7 @@ CACHE                                                   *nvim-sixel-extmarks-cac
         are excluded from the top and bottom of the image.
 
 
-TMUX                                                    *nvim-sixel-extmarks-tmux*
+TMUX                                                    *nvim-image-extmarks-tmux*
 
         As of writing this documentation, tmux, the terminal multiplexer,
         newly supports sixel content. However, if you experiment with this
@@ -45,7 +45,7 @@ TMUX                                                    *nvim-sixel-extmarks-tmu
 
 
 --------------------------------------------------------------------------------
-COMMANDS                                                *nvim-sixel-extmarks-command*
+COMMANDS                                                *nvim-image-extmarks-command*
 
 :[range]CreateImage {filepath}                          *CreateImage*
 
@@ -145,7 +145,7 @@ sixel_extmarks.clear_screen()
 
         Clear all content drawn to the screen. Unlike |:mode|, this has the
         additional guarantee of working inside a tmux session.
-        See also |nvim-sixel-extmarks-tmux|.
+        See also |nvim-image-extmarks-tmux|.
 
 
                                                         *sixel_extmarks.redraw*
@@ -184,8 +184,7 @@ sixel_extmarks.dump_blob_cache()
 
 
 --------------------------------------------------------------------------------
-CONFIGURATION                                           *nvim-sixel-extmarks-configuration*
-
+CONFIGURATION                                           *nvim-image-extmarks-configuration*
 
 g:image_extmarks_buffer_ms                              *g:image_extmarks_buffer_ms*
 
@@ -193,6 +192,33 @@ g:image_extmarks_buffer_ms                              *g:image_extmarks_buffer
         being cleared and extmarks being redrawn. If multiple redraws occur in
         quick succession, then this can prevent flashing due to the screen
         clearing and redrawing.
+
+
+--------------------------------------------------------------------------------
+AUTOCMDS                                                *nvim-sixel-extmarks-autocmds*
+                                                        *ImageExtmarks*
+
+        |autocmd|s which are used by the plugin live under the group
+        `ImageExtmarks`. These include:
+
+        - |TabClosed|, |TextChanged|, |TextChangedI|, |CursorMoved|
+            - Attempt to redraw, if necessary
+        - |VimEnter|, |VimResized|, |TabEnter|
+            - Force redraw
+        - |TabLeave|, |ExitPre|
+            - Clear the screen of all sixel images
+        
+        These attempt to replicate the feel of normal text extmarks without
+        extra configuration.
+        They can be overridden or unbound at your leisure using |autocmd|!.
+
+
+EVENTS                                                  *nvim-sixel-extmarks-events*
+                                                        *ImageExtmarks#pre_draw*
+
+        `User`-type autocmds are fired under the `ImageExtmarks#pre_draw`
+        group immediately before drawing sixel blobs.
+
 
 ================================================================================
 vim:tw=80:nosta:ft=help:fen:
