@@ -90,7 +90,7 @@ sixel_extmarks.get(
 
 
                                                         *sixel_extmarks.get_by_id*
-sixel_extmarks.get_by_id({id}: integer)
+sixel_extmarks.get_by_id({id}: integer) -> image_extmark|nil
 
         Retrieve an extmark in the current buffer with the given id.
 
@@ -153,6 +153,20 @@ sixel_extmarks.redraw()
 sixel_extmarks.redraw({force}: boolean)
 
         Clear the screen and redraw the currently displayed content.
+
+
+                                                        *sixel_extmarks.set_extmark_error*
+sixel_extmarks.set_extmark_error(
+  {id}: integer|image_extmark,
+  {error_text}: string|nil
+)
+
+        Set error text on an extmark.
+
+        {id} can be either the id of the extmark or a value returned by
+        |sixel_extmarks.get|
+        {error_text} is the error text to set on the extmark or nil if the error
+        should be cleared.
 
 
                                                         *sixel_extmarks.disable_drawing*

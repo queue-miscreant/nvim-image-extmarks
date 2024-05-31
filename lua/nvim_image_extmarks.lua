@@ -15,8 +15,8 @@ assert(
   ),
   "g:image_extmarks_buffer_ms must be a number"
 )
-vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
 vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
+vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
 
 
 ---@diagnostic disable-next-line
@@ -64,6 +64,8 @@ local function bind_autocmds()
       window_drawing.enable_drawing()
     end
   })
+
+  vim.b.bound_autocmds = true
 end
 
 
@@ -79,7 +81,8 @@ function sixel_extmarks.create(start_row, end_row, path)
   -- Bind extmarks if we need to
   if (
     vim.b.image_extmark_to_path ~= nil and
-    vim.tbl_count(vim.b.image_extmark_to_path) > 0
+    vim.tbl_count(vim.b.image_extmark_to_path) > 0 and
+    not vim.b.bound_autocmds
   ) then
     bind_autocmds()
   end
@@ -87,6 +90,18 @@ function sixel_extmarks.create(start_row, end_row, path)
   window_drawing.draw_visible_blobs()
 
   return id
+end
+
+
+-- Create an "image" extmark in the current buffer which displays an error,
+-- but can be updated later to hold an image.
+--
+---@param start_row integer The (0-indexed) row of the buffer that the image would end on
+---@param end_row integer The (0-indexed) row of the buffer that the image would end on
+---@param error_text string The error text to display
+---@return integer
+function sixel_extmarks.create_error(start_row, end_row, error_text)
+  return interface.create_error_extmark(start_row, end_row, error_text)
 end
 
 
@@ -209,6 +224,16 @@ function sixel_extmarks.redraw(force)
 end
 
 
+-- Set error text on an extmark.
+--
+---@param id integer The id of the extmark
+---@param error_text string The error text to display
+function sixel_extmarks.set_extmark_error(id, error_text)
+  interface.set_extmark_error(id, error_text)
+  window_drawing.draw_visible_blobs()
+end
+
+
 -- Disable drawing blobs.
 -- Blobs will still be generated in the background, but the contents will not
 -- be pushed to the screen.
@@ -218,7 +243,7 @@ function sixel_extmarks.disable_drawing()
 end
 
 
--- Enable drawing blobs, after having disabled them with `disable_drawing`.
+-- Enable drawing blobs, after having disabled them with `sixel_extmarks.disable_drawing`.
 --
 ---@param redraw? boolean Whether or not to redraw the screen afterward. True if not given.
 function sixel_extmarks.enable_drawing(redraw)

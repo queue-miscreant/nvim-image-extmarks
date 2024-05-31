@@ -83,7 +83,7 @@ The return value is a list of tables with the following structure:
 
 ### sixel\_extmarks.get\_by\_id
 
-`sixel_extmarks.get_by_id(id: integer)`
+`sixel_extmarks.get_by_id(id: integer) -> image_extmark|nil`
 
 Retrieve an extmark in the current buffer with the given id.
 Returns a table which is structured the same as the entries of the return type
@@ -165,6 +165,16 @@ Blobs will still be generated in the background, but the contents will not
 be pushed to the screen.
 
 
+### sixel\_extmarks.set\_extmark\_error
+
+`sixel_extmarks.set_extmark_error(id: integer|image_extmark, error_text: string|nil)`
+
+Set error text on an extmark.
+
+`id` can be either the id of the extmark or a value returned by `sixel_extmarks.get`
+`error_text` is the error text to set on the extmark or nil if the error should be cleared.
+
+
 ### sixel\_extmarks.enable\_drawing
 
 `sixel_extmarks.enable_drawing()`
@@ -230,5 +240,4 @@ before drawing sixel blobs.
 TODOs
 -----
 
-- Push failure messages to extmark
 - Crop thresholds

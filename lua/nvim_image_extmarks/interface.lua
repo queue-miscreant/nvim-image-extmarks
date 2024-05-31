@@ -8,11 +8,55 @@
 ---@field id integer
 ---@field start_row integer
 ---@field end_row integer
----@field path string
+---@field path string|nil
+---@field error string|nil
 
 local interface = {
   namespace = vim.api.nvim_create_namespace("Nvim-image"),
 }
+
+---@type fun(path: string): string
+local path_normalizer
+if vim.fs ~= nil then
+  path_normalizer = vim.fs.normalize
+else
+  path_normalizer = vim.fn.expandcmd
+end
+
+---@param id integer
+---@param path string
+---@return boolean
+local function set_path_dict(id, path)
+  path = path_normalizer(path)
+  if vim.fn.filereadable(path) == 0 then
+    return false
+  end
+
+  pcall(function()
+    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+  end)
+
+  vim.cmd(("let b:image_extmark_to_path[%d] = '%s'"):format(
+    id,
+    vim.fn.escape(path, "'\\")
+  ))
+  return true
+end
+
+
+---@param id integer
+---@param error_text string|nil
+local function set_error_dict(id, error_text)
+  if error_text == nil then
+    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+    return
+  end
+
+  vim.cmd(("let b:image_extmark_to_error[%d] = '%s'"):format(
+    id,
+    vim.fn.escape(error_text:gsub("\n", "\\n"), "'\\")
+  ))
+end
 
 
 ---@param start_row integer
@@ -25,47 +69,82 @@ function interface.create_image(start_row, end_row, path)
     interface.namespace,
     start_row,
     0,
-    { end_row=end_row }
+    { end_row = end_row }
   )
 
   if vim.b.image_extmark_to_path == nil then
     vim.b.image_extmark_to_path = vim.empty_dict()
   end
 
-  vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
-    id,
-    vim.fn.escape(path, "'\\")
-  ))
+  if not set_path_dict(id, path) then
+    interface.set_extmark_error(
+      id,
+      ("Cannot read file `%s`!"):format(path)
+    )
+  end
+  return id
+end
 
+
+---@param start_row integer The (0-indexed) row of the buffer that the image would end on
+---@param end_row integer The (0-indexed) row of the buffer that the image would end on
+---@param error_text string The error text to display
+---@return integer
+function interface.create_error(start_row, end_row, error_text)
+  local id = vim.api.nvim_buf_set_extmark(
+    0,
+    interface.namespace,
+    start_row,
+    0,
+    {
+      end_row = end_row,
+      virt_text = { { error_text, "ErrorMsg" } }
+    }
+  )
+
+  if vim.b.image_extmark_to_error == nil then
+    vim.b.image_extmark_to_error = vim.empty_dict()
+  end
+
+  set_error_dict(id, error_text)
   return id
 end
 
 
 -- Convert extmark from nvim_buf_get_extmark{_by_id,s} to idiomatic form
 --
----@param extmark [integer, integer, integer, {end_row: integer}]
----@return image_extmark
+---@param extmark [integer, integer, integer, {end_row: integer}]|nil
+---@return image_extmark|nil
 local function convert_extmark(extmark)
-    return {
-      id = extmark[1],
-      start_row = extmark[2],
-      end_row = extmark[4].end_row,
-      path = vim.b.image_extmark_to_path[tostring(extmark[1])]
-    }
+  if extmark == nil then return nil end
+
+  local _, content, errors = pcall(function()
+    return
+      vim.b.image_extmark_to_path[tostring(extmark[1])],
+      vim.b.image_extmark_to_error[tostring(extmark[1])]
+  end)
+  return {
+    id = extmark[1],
+    start_row = extmark[2],
+    end_row = extmark[4].end_row,
+    path = content,
+    error = errors
+  }
 end
 
 
 ---@param id integer
----@return image_extmark
+---@return image_extmark|nil
 function interface.get_image_extmark_by_id(id)
-  local extmarks = vim.api.nvim_buf_get_extmark_by_id(
+  local extmark = vim.api.nvim_buf_get_extmark_by_id(
     0,
     interface.namespace,
     id,
-    { details=true }
+    { details = true }
   )
+  if extmark == nil then return nil end
 
-  return convert_extmark(extmarks)
+  return convert_extmark{id, unpack(extmark)} ---@diagnostic disable-line
 end
 
 
@@ -78,7 +157,7 @@ function interface.get_image_extmarks(start_row, end_row)
     interface.namespace,
     start_row,
     end_row,
-    { details=true }
+    { details = true }
   )
 
   return vim.tbl_map(convert_extmark, extmarks)
@@ -87,7 +166,12 @@ end
 
 ---@param id integer
 function interface.remove_image_extmark(id)
-  vim.b.image_extmark_to_path[tostring(id)] = nil
+  pcall(function()
+    vim.cmd(("unlet vim.b.image_extmark_to_path[%d]"):format(id))
+  end)
+  pcall(function()
+    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+  end)
 
   return vim.api.nvim_buf_del_extmark(
     0,
@@ -99,6 +183,7 @@ end
 
 function interface.remove_images()
   vim.b.image_extmark_to_path = vim.empty_dict()
+  vim.b.image_extmark_to_error = vim.empty_dict()
   return vim.api.nvim_buf_clear_namespace(
     0,
     interface.namespace,
@@ -125,7 +210,7 @@ function interface.move_extmark(id, start_row, end_row)
     interface.namespace,
     start_row,
     0,
-    { id=id, end_row=end_row }
+    { id = id, end_row = end_row }
   )
 end
 
@@ -144,10 +229,38 @@ function interface.change_extmark_content(id, path)
   )
   if extmark == nil or map[tostring(id)] == nil then return end
 
-  vim.cmd.let(("b:image_extmark_to_path[%d] = '%s'"):format(
-    id,
-    vim.fn.escape(path, "'\\")
-  ))
+  if not set_path_dict(id, path) then
+    interface.set_extmark_error(id, ("Cannot read file `%s`!"):format(path))
+  end
+end
+
+
+---@param id integer
+---@param error_text string|nil
+---@param remember? boolean
+function interface.set_extmark_error(id, error_text, remember)
+  if remember or remember == nil then
+    if vim.b.image_extmark_to_error == nil then
+      vim.b.image_extmark_to_error = vim.empty_dict()
+    end
+
+    set_error_dict(id, error_text)
+  end
+
+  local data = interface.get_image_extmark_by_id(id)
+  if data == nil then return end
+
+  vim.api.nvim_buf_set_extmark(
+    0,
+    interface.namespace,
+    data.start_row,
+    0,
+    {
+      id = id,
+      end_row = data.end_row,
+      virt_text = { { error_text, "ErrorMsg" } },
+    }
+  )
 end
 
 return interface

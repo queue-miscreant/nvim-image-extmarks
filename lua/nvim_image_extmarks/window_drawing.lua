@@ -8,7 +8,13 @@ local interface = require "nvim_image_extmarks/interface"
 local blob_cache = require "nvim_image_extmarks/blob_cache"
 
 pcall(sixel_raw.get_tty)
+
+---@class debounce_data
+---@field extmark wrapped_extmark
+---@field draw_number integer
+
 local window_drawing = {
+  ---@type table<string, debounce_data>
   debounce = {},
   enabled = true,
   just_enabled = true
@@ -67,13 +73,31 @@ end
 ---@param path string
 ---@param char_pixel_height integer
 local function schedule_generate_blob(extmark, path, char_pixel_height)
-  local draw_number = window_drawing.debounce[tostring(extmark.id)]
-  if draw_number == nil then
-    draw_number = 0
-  else
-    draw_number = draw_number + 1
+  local debounce = window_drawing.debounce[tostring(extmark.id)]
+  local has_same_data = (
+    debounce ~= nil and
+    debounce.extmark.height == extmark.height and
+    debounce.extmark.crop_row_start == extmark.crop_row_start and
+    debounce.extmark.crop_row_end == extmark.crop_row_end
+  )
+
+  -- don't bother if we have a proces with identical parameters (size, crop) running
+  if has_same_data then
+    return
   end
-  window_drawing.debounce[tostring(extmark.id)] = draw_number
+
+  if debounce == nil then
+    debounce = {
+      extmark = extmark,
+      draw_number = 0
+    }
+  else
+    debounce = {
+      extmark = extmark,
+      draw_number = debounce.draw_number + 1
+    }
+  end
+  window_drawing.debounce[tostring(extmark.id)] = debounce
 
   sixel_raw.blobify(
     extmark,
@@ -81,7 +105,7 @@ local function schedule_generate_blob(extmark, path, char_pixel_height)
     char_pixel_height,
     function(blob)
       vim.defer_fn(function()
-        if draw_number ~= window_drawing.debounce[tostring(extmark.id)] then
+        if debounce.draw_number ~= window_drawing.debounce[tostring(extmark.id)].draw_number then
           return
         end
 
@@ -92,6 +116,15 @@ local function schedule_generate_blob(extmark, path, char_pixel_height)
 
         window_drawing.cache_and_draw_blob(blob, path, extmark)
         window_drawing.debounce[tostring(extmark.id)] = nil
+      end, 0)
+    end,
+    function(error)
+      if error == nil then return end
+      vim.defer_fn(function()
+        interface.set_extmark_error(
+          extmark.id,
+          error
+        )
       end, 0)
     end
   )
@@ -107,7 +140,7 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     interface.namespace,
     0,
     -1,
-    { details=true }
+    { details = true }
   )
   local cursor_row = vim.fn.line(".")
 
@@ -121,8 +154,13 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     local crop_row_start = math.max(0, top_line - start_row)
     local crop_row_end = math.max(0, end_row - bottom_line)
 
-    -- Hide the extmark if the cursor is there
-    if start_row <= cursor_row and cursor_row <= end_row then
+    if (
+      start_row <= cursor_row and -- Hide the extmark if the cursor is there
+      cursor_row <= end_row and (
+        vim.b.image_extmark_to_error == nil or
+        vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
+      )
+    ) then
       return nil
     end
 
@@ -143,25 +181,46 @@ end
 ---@param char_pixel_height integer
 ---@return [string, [number, number]] | nil
 local function lookup_or_generate_blob(extmark, windims, char_pixel_height)
+  local error = vim.b.image_extmark_to_error[tostring(extmark.id)]
   local path = vim.b.image_extmark_to_path[tostring(extmark.id)]
+
+  if error ~= nil then
+    interface.set_extmark_error(
+      extmark.id,
+      error,
+      false
+    )
+    return nil
+  end
   if path == nil then
-    vim.api.nvim_buf_set_extmark(0, interface.namespace, extmark.start_row, 0, {
-      id=extmark.id,
-      virt_text= { { "Extmark lookup failure!", "ErrorMsg" } },
-      end_row=extmark.end_row,
-    })
+    interface.set_extmark_error(
+      extmark.id,
+      "Could not match extmark to content!"
+    )
     return nil
   end
 
   -- Get rid of the text
-  vim.api.nvim_buf_set_extmark(0, interface.namespace, extmark.start_row, 0, {
-    id=extmark.id,
-    end_row=extmark.end_row,
-  })
+  vim.api.nvim_buf_set_extmark(
+    0,
+    interface.namespace,
+    extmark.start_row,
+    0,
+    {id = extmark.id, end_row = extmark.end_row, }
+  )
 
   local cache_lookup = blob_cache.get(path, extmark)
+
   if cache_lookup == nil then
-    -- TODO: Needed async guarantees - window position and other drawing parameters are unchanged
+    -- Try to find the file
+    if vim.fn.filereadable(path) == 0 then
+      interface.set_extmark_error(
+        extmark.id,
+        ("Cannot read file `%s`!"):format(path)
+      )
+      return nil
+    end
+
     schedule_generate_blob(extmark, path, char_pixel_height)
     return nil
   end
@@ -184,7 +243,6 @@ function window_drawing.extmarks_needing_update(force)
   local new_line = vim.fn.line("$")
 
   -- Try getting the visible extmarks, since the cache seems valid
-
   local extmarks = vim.tbl_values(
     window_drawing.get_visible_extmarks(
       new_dims.top_line,
@@ -228,6 +286,10 @@ function window_drawing.draw_blobs(extmarks, windims)
     vim.b.image_extmark_to_path = vim.empty_dict()
   end
 
+  if vim.b.image_extmark_to_error == nil then
+    vim.b.image_extmark_to_error = vim.empty_dict()
+  end
+
   local char_pixel_height = sixel_raw.char_pixel_height()
 
   local blobs = vim.tbl_map(
@@ -242,7 +304,7 @@ function window_drawing.draw_blobs(extmarks, windims)
   if window_drawing.enabled then
     vim.api.nvim_exec_autocmds("User", {
       group="ImageExtmarks#pre_draw",
-      data=extmarks
+      data = extmarks
     })
     sixel_raw.draw_sixels(blobs)
   end

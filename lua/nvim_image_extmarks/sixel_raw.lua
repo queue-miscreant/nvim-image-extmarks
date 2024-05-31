@@ -93,7 +93,7 @@ function sixel_raw.draw_sixels(blob_ranges)
     local stdout = assert(io.open(sixel_raw.tty, "ab"))
     stdout:write("\x1b[s")
 
-    for _, blob_range in ipairs(blob_ranges) do
+    for _, blob_range in pairs(blob_ranges) do
       local winpos = blob_range[2]
       stdout:write(("\x1b[%d;%dH"):format(winpos[1], winpos[2]))
       stdout:write(blob_range[1])
@@ -149,7 +149,7 @@ function sixel_raw.blobify(
   local stderr = vim.loop.new_pipe()
   vim.loop.spawn("convert", {
     args = {
-      vim.fs.normalize(filepath) .. "[0]",
+      filepath .. "[0]",
       "(",
       "+resize",
       resize,
