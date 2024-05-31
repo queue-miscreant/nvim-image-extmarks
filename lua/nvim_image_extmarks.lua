@@ -29,11 +29,40 @@ local function bind_autocmds()
     buffer = 0,
     callback = function() sixel_extmarks.redraw() end
   })
-  vim.api.nvim_create_autocmd({ "VimEnter", "VimResized", "TabEnter" }, {
+  vim.api.nvim_create_autocmd({ "VimEnter", "VimResized" }, {
     group = "ImageExtmarks",
     buffer = 0,
     callback = function() sixel_extmarks.redraw(true) end
   })
+
+  -- Vim quirk: attempting to redraw at TabEnter after TabNew will use the
+  -- previous buffer (but the new window), since BufEnter has not happened yet
+  -- 
+  -- So don't bother redrawing a new tab is created
+  vim.api.nvim_create_autocmd("TabNew", {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function() sixel_extmarks.creating_tab = true end
+  })
+  vim.api.nvim_create_autocmd("TabEnter", {
+    group = "ImageExtmarks",
+    buffer = 0,
+    callback = function()
+      if sixel_extmarks.creating_tab ~= nil then
+        sixel_extmarks.creating_tab = nil
+        return
+      end
+
+      sixel_extmarks.redraw(true)
+    end
+  })
+
+  -- -- TODO: draw all extmarks in window
+  -- for _, win_id in pairs(vim.api.nvim_tabpage_list_wins(0)) do
+  --   vim.print(vim.fn.bufnr())
+  --   vim.api.nvim_win_call(win_id, function() sixel_extmarks.redraw(true) end)
+  -- end
+
   vim.api.nvim_create_autocmd({ "TabLeave", "ExitPre" }, {
     group = "ImageExtmarks",
     buffer = 0,
@@ -107,7 +136,7 @@ end
 
 -- Retrieve a list of extmarks in the current buffer between the given rows.
 -- To retrieve all extmarks in the current buffer, use parameters (0, -1).
--- 
+--
 ---@param start_row integer The (0-indexed) row to start searching from
 ---@param end_row integer
 ---@return image_extmark[]
@@ -118,7 +147,7 @@ end
 -- Retrieve an extmark in the current buffer with the given id.
 --
 ---@param id integer The id of the extmark
----@return image_extmark
+---@return image_extmark|nil
 function sixel_extmarks.get_by_id(id)
   return interface.get_image_extmark_by_id(id)
 end
@@ -126,7 +155,7 @@ end
 
 -- Delete the extmark in the current buffer.
 -- Note that this will NOT remove blobs from the cache.
--- 
+--
 ---@param id integer The id of the extmark to remove
 function sixel_extmarks.remove(id)
   local ret = interface.remove_image_extmark(id)
@@ -265,8 +294,8 @@ end
 
 local function create_image_command(opts)
   sixel_extmarks.create(
-    opts.line1,
-    opts.line2,
+    opts.line1 - 1,
+    opts.line2 - 1,
     opts.args
   )
 end

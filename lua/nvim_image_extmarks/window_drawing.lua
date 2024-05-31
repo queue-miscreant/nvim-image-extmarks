@@ -48,7 +48,7 @@ end
 ---@param windims window_dimensions The current dimensions of the window
 ---@return [integer, integer]
 local function window_to_terminal(start_row, windims)
-    local row = windims.start_line + start_row - windims.top_line
+    local row = windims.start_line + start_row - windims.top_line + 1
     local column = windims.window_column + windims.start_column
 
     return { row, column }
@@ -142,7 +142,7 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     -1,
     { details = true }
   )
-  local cursor_row = vim.fn.line(".")
+  local cursor_row = vim.fn.line(".") - 1
 
   return vim.tbl_map(function(extmark)
     local start_row, end_row = extmark[2], extmark[4].end_row
@@ -206,7 +206,10 @@ local function lookup_or_generate_blob(extmark, windims, char_pixel_height)
     interface.namespace,
     extmark.start_row,
     0,
-    {id = extmark.id, end_row = extmark.end_row, }
+    {
+      id = extmark.id,
+      end_row = extmark.end_row
+    }
   )
 
   local cache_lookup = blob_cache.get(path, extmark)
@@ -245,8 +248,8 @@ function window_drawing.extmarks_needing_update(force)
   -- Try getting the visible extmarks, since the cache seems valid
   local extmarks = vim.tbl_values(
     window_drawing.get_visible_extmarks(
-      new_dims.top_line,
-      new_dims.bottom_line
+      new_dims.top_line - 1,
+      new_dims.bottom_line - 1
     )
   )
   local new_extmark = table.concat(

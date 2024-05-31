@@ -142,7 +142,7 @@ function interface.get_image_extmark_by_id(id)
     id,
     { details = true }
   )
-  if extmark == nil then return nil end
+  if #extmark == 0 then return nil end
 
   return convert_extmark{id, unpack(extmark)} ---@diagnostic disable-line
 end
@@ -230,7 +230,10 @@ function interface.change_extmark_content(id, path)
   if extmark == nil or map[tostring(id)] == nil then return end
 
   if not set_path_dict(id, path) then
-    interface.set_extmark_error(id, ("Cannot read file `%s`!"):format(path))
+    interface.set_extmark_error(
+      id,
+      ("Cannot read file `%s`!"):format(path)
+    )
   end
 end
 
