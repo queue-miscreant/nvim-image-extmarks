@@ -29,7 +29,7 @@ local function bind_autocmds()
     buffer = 0,
     callback = function() sixel_extmarks.redraw() end
   })
-  vim.api.nvim_create_autocmd({ "VimEnter", "VimResized" }, {
+  vim.api.nvim_create_autocmd({ "VimEnter", "WinResized" }, {
     group = "ImageExtmarks",
     buffer = 0,
     callback = function() sixel_extmarks.redraw(true) end
@@ -56,12 +56,6 @@ local function bind_autocmds()
       sixel_extmarks.redraw(true)
     end
   })
-
-  -- -- TODO: draw all extmarks in window
-  -- for _, win_id in pairs(vim.api.nvim_tabpage_list_wins(0)) do
-  --   vim.print(vim.fn.bufnr())
-  --   vim.api.nvim_win_call(win_id, function() sixel_extmarks.redraw(true) end)
-  -- end
 
   vim.api.nvim_create_autocmd({ "TabLeave", "ExitPre" }, {
     group = "ImageExtmarks",
@@ -116,7 +110,7 @@ function sixel_extmarks.create(start_row, end_row, path)
     bind_autocmds()
   end
 
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 
   return id
 end
@@ -159,7 +153,7 @@ end
 ---@param id integer The id of the extmark to remove
 function sixel_extmarks.remove(id)
   local ret = interface.remove_image_extmark(id)
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 
   return ret
 end
@@ -171,7 +165,7 @@ end
 ---@see sixel_extmarks.remove
 function sixel_extmarks.remove_all()
   local ret = interface.remove_images()
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 
   return ret
 end
@@ -186,7 +180,7 @@ end
 ---@param end_row integer
 function sixel_extmarks.move(id, start_row, end_row)
   local ret = interface.move_extmark(id, start_row, end_row)
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 
   return ret
 end
@@ -198,7 +192,7 @@ end
 ---@param path string The path to the file containing the new content.
 function sixel_extmarks.change_content(id, path)
   local ret = interface.change_extmark_content(id, path)
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 
   return ret
 end
@@ -226,11 +220,26 @@ end
 --
 ---@param force? boolean Force redraw
 function sixel_extmarks.redraw(force)
-  local extmarks = window_drawing.extmarks_needing_update(force)
-  if extmarks == nil then return end
+  local windows = vim.api.nvim_tabpage_list_wins(0)
+  local need_update = {}
+
+  for i, window in pairs(windows) do
+    local updates = vim.api.nvim_win_call(window, function()
+      return {window, window_drawing.extmarks_needing_update(force)}
+    end)
+    if updates[2] ~= nil and #updates[2] > 0 then
+      table.insert(need_update, updates)
+    end
+  end
+
+  if #need_update == 0 then return end
 
   if vim.g.image_extmarks_buffer_ms == nil then
-    window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+    for i, window_extmarks in pairs(need_update) do
+      vim.api.nvim_win_call(window_extmarks[1], function()
+        window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
+      end)
+    end
     return
   -- "Renew" the timer by cancelling it first
   elseif extmark_timer ~= nil then
@@ -247,7 +256,12 @@ function sixel_extmarks.redraw(force)
     vim.schedule_wrap(function()
       extmark_timer:stop()
       extmark_timer:close()
-      window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+      -- window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
+      for i, window_extmarks in pairs(need_update) do
+        vim.api.nvim_win_call(window_extmarks[1], function()
+          window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
+        end)
+      end
     end)
   )
 end
@@ -259,7 +273,7 @@ end
 ---@param error_text string The error text to display
 function sixel_extmarks.set_extmark_error(id, error_text)
   interface.set_extmark_error(id, error_text)
-  window_drawing.draw_visible_blobs()
+  sixel_extmarks.redraw()
 end
 
 

@@ -155,8 +155,8 @@ function interface.get_image_extmarks(start_row, end_row)
   local extmarks = vim.api.nvim_buf_get_extmarks(
     0,
     interface.namespace,
-    start_row,
-    end_row,
+    {start_row, 0},
+    {end_row, -1},
     { details = true }
   )
 
