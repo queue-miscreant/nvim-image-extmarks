@@ -18,35 +18,37 @@ assert(
 vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
 vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
 
-
----@diagnostic disable-next-line
-sixel_extmarks = {}
-
-
-local function bind_autocmds()
-  vim.api.nvim_create_autocmd({ "TabClosed", "CursorMoved", "TextChanged", "TextChangedI" }, {
+vim.api.nvim_create_autocmd(
+  {
+    "VimEnter",
+    "VimResized",
+    "WinResized",
+    "WinScrolled"
+  },
+  {
     group = "ImageExtmarks",
-    buffer = 0,
-    callback = function() sixel_extmarks.redraw() end
-  })
-  vim.api.nvim_create_autocmd({ "VimEnter", "WinResized" }, {
-    group = "ImageExtmarks",
-    buffer = 0,
     callback = function() sixel_extmarks.redraw(true) end
-  })
+  }
+)
 
-  -- Vim quirk: attempting to redraw at TabEnter after TabNew will use the
-  -- previous buffer (but the new window), since BufEnter has not happened yet
-  -- 
-  -- So don't bother redrawing a new tab is created
-  vim.api.nvim_create_autocmd("TabNew", {
+-- Vim quirk: attempting to redraw at TabEnter after TabNew will use the
+-- previous buffer (but the new window), since BufEnter has not happened yet
+--
+-- So don't bother redrawing a new tab is created
+vim.api.nvim_create_autocmd(
+  "TabNew",
+  {
     group = "ImageExtmarks",
-    buffer = 0,
     callback = function() sixel_extmarks.creating_tab = true end
-  })
-  vim.api.nvim_create_autocmd("TabEnter", {
+  }
+)
+vim.api.nvim_create_autocmd(
+  {
+    "TabEnter",
+    "TabClosed"
+  },
+  {
     group = "ImageExtmarks",
-    buffer = 0,
     callback = function()
       if sixel_extmarks.creating_tab ~= nil then
         sixel_extmarks.creating_tab = nil
@@ -55,12 +57,33 @@ local function bind_autocmds()
 
       sixel_extmarks.redraw(true)
     end
-  })
+  }
+)
 
-  vim.api.nvim_create_autocmd({ "TabLeave", "ExitPre" }, {
+vim.api.nvim_create_autocmd(
+  {
+    "TabLeave",
+    "ExitPre"
+  },
+  {
+    group = "ImageExtmarks",
+    callback = function() sixel_extmarks.clear_screen() end
+  }
+)
+
+
+-- Namespace for plugin functions
+--
+---@diagnostic disable-next-line
+sixel_extmarks = {}
+
+-- Add autocommands which depend on buffer contents and window positions
+--
+local function bind_local_autocmds()
+  vim.api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "TextChangedI" }, {
     group = "ImageExtmarks",
     buffer = 0,
-    callback = function() sixel_extmarks.clear_screen() end
+    callback = function() sixel_extmarks.redraw() end
   })
 
   vim.api.nvim_create_autocmd("InsertEnter", {
@@ -87,9 +110,10 @@ local function bind_autocmds()
       window_drawing.enable_drawing()
     end
   })
-
   vim.b.bound_autocmds = true
 end
+
+
 
 
 -- Create a new image extmark in the current buffer.
@@ -107,7 +131,7 @@ function sixel_extmarks.create(start_row, end_row, path)
     vim.tbl_count(vim.b.image_extmark_to_path) > 0 and
     not vim.b.bound_autocmds
   ) then
-    bind_autocmds()
+    bind_local_autocmds()
   end
 
   sixel_extmarks.redraw()
@@ -220,10 +244,15 @@ end
 --
 ---@param force? boolean Force redraw
 function sixel_extmarks.redraw(force)
+  -- Update the pixel height if this is a forced redraw
+  if force then
+    sixel_raw.get_pixel_height()
+  end
+
   local windows = vim.api.nvim_tabpage_list_wins(0)
   local need_update = {}
 
-  for i, window in pairs(windows) do
+  for _, window in pairs(windows) do
     local updates = vim.api.nvim_win_call(window, function()
       return {window, window_drawing.extmarks_needing_update(force)}
     end)
@@ -235,7 +264,7 @@ function sixel_extmarks.redraw(force)
   if #need_update == 0 then return end
 
   if vim.g.image_extmarks_buffer_ms == nil then
-    for i, window_extmarks in pairs(need_update) do
+    for _, window_extmarks in pairs(need_update) do
       vim.api.nvim_win_call(window_extmarks[1], function()
         window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
       end)
@@ -256,8 +285,7 @@ function sixel_extmarks.redraw(force)
     vim.schedule_wrap(function()
       extmark_timer:stop()
       extmark_timer:close()
-      -- window_drawing.draw_blobs(extmarks, vim.w.vim_image_window_cache)
-      for i, window_extmarks in pairs(need_update) do
+      for _, window_extmarks in pairs(need_update) do
         vim.api.nvim_win_call(window_extmarks[1], function()
           window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
         end)

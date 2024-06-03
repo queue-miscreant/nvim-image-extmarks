@@ -15,6 +15,7 @@ local ffi = require "ffi"
 
 local sixel_raw = {
   tty = nil,
+  char_pixel_height = 0,
   screen_cleared = true
 }
 
@@ -36,12 +37,12 @@ int ioctl(int fd, int cmd, ...);
 -- Perform the above ioctl operation and calculate the height of a character in pixels
 --
 ---@return number
-function sixel_raw.char_pixel_height()
+function sixel_raw.get_pixel_height()
   local buf = ffi.new("struct winsize")
   ffi.C.ioctl(1, TIOCGWINSZ, buf)
 
   if buf.ws_ypixel > 2 then
-    return math.floor(buf.ws_ypixel / buf.ws_row)
+    sixel_raw.char_pixel_height = math.floor(buf.ws_ypixel / buf.ws_row)
   end
   return 28
 end
@@ -127,22 +128,20 @@ end
 --
 ---@param extmark wrapped_extmark A wrapped extmark, containing height and crop data (in rows)
 ---@param filepath string A path to a file, from which the image blob is generated
----@param char_pixel_height integer Height of a row of the terminal, in pixels
 ---@param callback fun(blob: string): any A callback function which is called with the generated blob
 ---@param error_callback? fun(errors: string): any An optional callback function, called with error information
 function sixel_raw.blobify(
   extmark,
   filepath,
-  char_pixel_height,
   callback,
   error_callback
 )
   -- resize to a suitable height
-  local resize = ("x%d"):format(extmark.height * char_pixel_height)
+  local resize = ("x%d"):format(extmark.height * sixel_raw.char_pixel_height)
   -- crop to the right size
   local crop = ("x%d+0+%d"):format(
-    (extmark.height - extmark.crop_row_start - extmark.crop_row_end) * char_pixel_height,
-    extmark.crop_row_start * char_pixel_height
+    (extmark.height - extmark.crop_row_start - extmark.crop_row_end) * sixel_raw.char_pixel_height,
+    extmark.crop_row_start * sixel_raw.char_pixel_height
   )
 
   local stdout = vim.loop.new_pipe()

@@ -71,9 +71,11 @@ end
 
 ---@param extmark wrapped_extmark
 ---@param path string
----@param char_pixel_height integer
-local function schedule_generate_blob(extmark, path, char_pixel_height)
-  local debounce = window_drawing.debounce[tostring(extmark.id)]
+local function schedule_generate_blob(extmark, path)
+  local buf = vim.api.nvim_get_current_buf()
+  local debounce = window_drawing.debounce[
+    tostring(buf) .. "." .. tostring(extmark.id)
+  ]
   local has_same_data = (
     debounce ~= nil and
     debounce.extmark.height == extmark.height and
@@ -102,7 +104,6 @@ local function schedule_generate_blob(extmark, path, char_pixel_height)
   sixel_raw.blobify(
     extmark,
     path,
-    char_pixel_height,
     function(blob)
       vim.defer_fn(function()
         if debounce.draw_number ~= window_drawing.debounce[tostring(extmark.id)].draw_number then
@@ -178,9 +179,8 @@ end
 
 ---@param extmark wrapped_extmark
 ---@param windims window_dimensions
----@param char_pixel_height integer
 ---@return [string, [number, number]] | nil
-local function lookup_or_generate_blob(extmark, windims, char_pixel_height)
+local function lookup_or_generate_blob(extmark, windims)
   local error = vim.b.image_extmark_to_error[tostring(extmark.id)]
   local path = vim.b.image_extmark_to_path[tostring(extmark.id)]
 
@@ -224,7 +224,7 @@ local function lookup_or_generate_blob(extmark, windims, char_pixel_height)
       return nil
     end
 
-    schedule_generate_blob(extmark, path, char_pixel_height)
+    schedule_generate_blob(extmark, path)
     return nil
   end
 
@@ -293,13 +293,10 @@ function window_drawing.draw_blobs(extmarks, windims)
     vim.b.image_extmark_to_error = vim.empty_dict()
   end
 
-  local char_pixel_height = sixel_raw.char_pixel_height()
-
   local blobs = vim.tbl_map(
     function(extmark) return lookup_or_generate_blob(
       extmark,
-      windims,
-      char_pixel_height
+      windims
     ) end,
     extmarks
   )
@@ -311,18 +308,6 @@ function window_drawing.draw_blobs(extmarks, windims)
     })
     sixel_raw.draw_sixels(blobs)
   end
-end
-
-
-function window_drawing.draw_visible_blobs()
-  local windims = get_windims()
-
-  local visible_extmarks = window_drawing.get_visible_extmarks(
-    windims.top_line - 1,
-    windims.bottom_line - 1
-  )
-
-  window_drawing.draw_blobs(visible_extmarks, windims)
 end
 
 
