@@ -217,9 +217,9 @@ Autocmds
 `autocmd`s which are used by the plugin live under the group `ImageExtmarks`.
 These include:
 
-- `TabClosed`, `TextChanged`, `TextChangedI`, `CursorMoved`
+- `CursorMoved`, `TabEnter`, `TabClosed`, `TextChanged`, `TextChangedI`
     - Attempt to redraw, if necessary
-- `VimEnter`, `VimResized`, `TabEnter`
+- `WinResized`, `WinScrolled`, `VimEnter`, `VimResized`
     - Force redraw
 - `TabLeave`, `ExitPre`
     - Clear the screen of all sixel images
@@ -240,4 +240,7 @@ before drawing sixel blobs.
 TODOs
 -----
 
+- Hide text behind extmark with highlight
+- Images crop to window width
+- Improve display after Ex command with multiline output?
 - Crop thresholds
