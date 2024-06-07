@@ -77,10 +77,10 @@ local function schedule_generate_blob(extmark, path)
     tostring(buf) .. "." .. tostring(extmark.id)
   ]
   local has_same_data = (
-    debounce ~= nil and
-    debounce.extmark.height == extmark.height and
-    debounce.extmark.crop_row_start == extmark.crop_row_start and
-    debounce.extmark.crop_row_end == extmark.crop_row_end
+    debounce ~= nil
+    and debounce.extmark.height == extmark.height
+    and debounce.extmark.crop_row_start == extmark.crop_row_start
+    and debounce.extmark.crop_row_end == extmark.crop_row_end
   )
 
   -- don't bother if we have a proces with identical parameters (size, crop) running
@@ -155,21 +155,26 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     local crop_row_start = math.max(0, top_line - start_row)
     local crop_row_end = math.max(0, end_row - bottom_line)
 
-    if (
-      start_row <= cursor_row and -- Hide the extmark if the cursor is there
-      cursor_row <= end_row and (
-        vim.b.image_extmark_to_error == nil or
-        vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
+    local bad_fold = vim.fn.foldcolumn(start_row + 1) ~= -1 or vim.fn.foldcolumn(end_row + 1)
+    local cursor_in_extmark = start_row <= cursor_row and cursor_row <= end_row
+
+    if
+      (cursor_in_extmark or bad_fold)
+      and (
+        vim.b.image_extmark_to_error == nil
+        or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
       )
-    ) then
+    then
       return nil
     end
+
+    local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all
 
     return {
       id = extmark[1],
       start_row = start_row,
       end_row = end_row,
-      height = end_row - start_row,
+      height = height,
       crop_row_start = crop_row_start,
       crop_row_end = crop_row_end,
     }
@@ -259,12 +264,12 @@ function window_drawing.extmarks_needing_update(force)
 
   if window_drawing.just_enabled then
     window_drawing.just_enabled = false
-  elseif (
-    not force and
-    vim.deep_equal(new_dims, window_cache) and -- Window has not moved
-    line_cache == vim.fn.line("$") and -- No lines have been added
-    new_extmark == drawing_cache -- And the same extmarks will be drawn
-  ) then
+  elseif
+    not force
+    and vim.deep_equal(new_dims, window_cache) -- Window has not moved
+    and line_cache == vim.fn.line("$") -- No lines have been added
+    and new_extmark == drawing_cache -- And the same extmarks will be drawn
+  then
     -- No need to redraw, same extmarks visible as before
     return nil
   end

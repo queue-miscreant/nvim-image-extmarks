@@ -240,7 +240,11 @@ before drawing sixel blobs.
 TODOs
 -----
 
-- Hide text behind extmark with highlight
+- FOLDS
 - Images crop to window width
+- Tabpage aggregation uses global tty positions
+    - Easier to cut down on redraws if only one window is scrolled
+- Hide text behind extmark with highlight
+    - This is more difficult than it seems. 256-color terminals use `gui` highlights, which don't support `start=`/`stop=`
 - Improve display after Ex command with multiline output?
 - Crop thresholds
