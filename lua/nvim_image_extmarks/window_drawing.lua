@@ -34,11 +34,11 @@ local function get_windims()
   local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
 
   return {
-      top_line = wininfo[1].topline,
-      bottom_line = wininfo[1].botline,
-      start_line = wininfo[1].winrow,
-      window_column = wininfo[1].wincol,
-      start_column = wininfo[1].textoff,
+      top_line = wininfo[1].topline,     -- top line of buffer
+      bottom_line = wininfo[1].botline,  -- bottom line of buffer
+      start_line = wininfo[1].winrow,    -- start row of current tabpage
+      window_column = wininfo[1].wincol, -- start column of current tabpage
+      start_column = wininfo[1].textoff, -- sign/number column offset
   }
 end
 
@@ -48,8 +48,12 @@ end
 ---@param windims window_dimensions The current dimensions of the window
 ---@return [integer, integer]
 local function window_to_terminal(start_row, windims)
-    local row = windims.start_line + start_row - windims.top_line + 1
-    local column = windims.window_column + windims.start_column
+  local row_offset = vim.api.nvim_win_text_height(
+    0,
+    { start_row = windims.top_line - 1, end_row = start_row }
+  ).all
+  local row = windims.start_line + row_offset - 1
+  local column = windims.window_column + windims.start_column
 
     return { row, column }
 end
@@ -155,7 +159,7 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     local crop_row_start = math.max(0, top_line - start_row)
     local crop_row_end = math.max(0, end_row - bottom_line)
 
-    local bad_fold = vim.fn.foldcolumn(start_row + 1) ~= -1 or vim.fn.foldcolumn(end_row + 1)
+    local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1 or vim.fn.foldclosed(end_row + 1) ~= -1
     local cursor_in_extmark = start_row <= cursor_row and cursor_row <= end_row
 
     if
@@ -168,7 +172,7 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
       return nil
     end
 
-    local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all
+    local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all - 1
 
     return {
       id = extmark[1],

@@ -241,6 +241,8 @@ TODOs
 -----
 
 - FOLDS
+    - Test folds with splits
+    - Test extmark boundaries inside fold
 - Images crop to window width
 - Tabpage aggregation uses global tty positions
     - Easier to cut down on redraws if only one window is scrolled
