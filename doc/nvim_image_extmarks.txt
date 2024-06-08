@@ -15,7 +15,7 @@ INTRODUCTION                                            *nvim-image-extmarks-int
 
         `magick -list format | grep -i sixel`
 
-        to see if your intsallation supports sixels.
+        to see if your installation supports sixels.
 
 
 CACHE                                                   *nvim-image-extmarks-cache*
@@ -243,6 +243,25 @@ EVENTS                                                  *nvim-sixel-extmarks-eve
 
         `User`-type autocmds are fired under the `ImageExtmarks#pre_draw`
         group immediately before drawing sixel blobs.
+
+
+--------------------------------------------------------------------------------
+FOLDING                                                 *nvim-sixel-extmarks-folding*
+
+The plugin tends to respect folds in two ways:
+
+- If an extmark intersects with a fold, then the image will not be drawn
+- If a fold is completely contained by an extmark, the image will be resized
+  to the folded height
+
+However, opening and closing folds will _not_ automatically trigger a redraw.
+Unfortunately, this is a Neovim limitation -- folding commands and keybinds do
+not trigger any autocmds (not even |WinScrolled|).
+
+                                                        *nvim-sixel-extmarks-Ex-command*
+
+Similarly, there is no way to detect when the terminal is scrolled with an
+Ex command, which can cause phantom image artifacts to be remain.
 
 
 ================================================================================

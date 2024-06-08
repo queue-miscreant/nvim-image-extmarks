@@ -62,23 +62,25 @@ end
 ---@param blob string
 ---@param path string
 ---@param extmark wrapped_extmark
-function window_drawing.cache_and_draw_blob(blob, path, extmark)
+function window_drawing.cache_and_draw_blob(blob, path, extmark, window)
   blob_cache.insert(blob, path, extmark)
 
-  local windims = get_windims()
-  sixel_raw.draw_sixel(
-    blob,
-    window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
-  )
+  vim.api.nvim_win_call(window, function()
+    local windims = get_windims()
+    sixel_raw.draw_sixel(
+      blob,
+      window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
+    )
+  end)
 end
 
 
 ---@param extmark wrapped_extmark
 ---@param path string
 local function schedule_generate_blob(extmark, path)
-  local buf = vim.api.nvim_get_current_buf()
+  local win = vim.api.nvim_get_current_win()
   local debounce = window_drawing.debounce[
-    tostring(buf) .. "." .. tostring(extmark.id)
+    tostring(win) .. "." .. tostring(extmark.id)
   ]
   local has_same_data = (
     debounce ~= nil
@@ -119,7 +121,7 @@ local function schedule_generate_blob(extmark, path)
           data={ extmark }
         })
 
-        window_drawing.cache_and_draw_blob(blob, path, extmark)
+        window_drawing.cache_and_draw_blob(blob, path, extmark, win)
         window_drawing.debounce[tostring(extmark.id)] = nil
       end, 0)
     end,

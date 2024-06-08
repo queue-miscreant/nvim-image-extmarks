@@ -35,6 +35,41 @@ Plugin 'queue-miscreant/nvim_image_extmarks'
 Make sure the file is sourced and run `:PluginInstall`.
 
 
+Limitations
+-----------
+
+### Folding
+
+The plugin tends to respect folds in two ways:
+
+- If an extmark intersects with a fold, then the image will not be drawn
+- If a fold is completely contained by an extmark, the image will be resized to the folded height
+
+However, opening and closing folds will _not_ automatically trigger a redraw.
+Unfortunately, this is a Neovim limitation -- folding commands and keybinds do not trigger any
+autocmds (not even `WinScrolled`).
+
+
+### Scrolling
+
+Similarly, there is no way to detect when the terminal is scrolled with an Ex command, which
+can cause phantom image artifacts to be remain.
+
+
+### tmux
+
+As of writing this documentation, tmux, the terminal multiplexer, newly supports sixel content.
+However, if you experiment with this feature on your own, you may find that sixels are
+"sticky" between panes and windows.
+
+To get around this, when clearing the screen, the plugin will attempt to "refresh" the content
+in the session by quickly detaching and attaching.
+With enough delay, this produces visible artifacts, including:
+
+    - boxes of "+" characters where the images would be displayed
+    - sixel binary content, which appears as random ASCII characters
+
+
 Commands
 --------
 
@@ -240,9 +275,6 @@ before drawing sixel blobs.
 TODOs
 -----
 
-- FOLDS
-    - Test folds with splits
-    - Test extmark boundaries inside fold
 - Images crop to window width
 - Tabpage aggregation uses global tty positions
     - Easier to cut down on redraws if only one window is scrolled
