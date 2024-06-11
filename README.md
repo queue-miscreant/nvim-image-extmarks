@@ -277,6 +277,7 @@ TODOs
 
 - Images crop to window width
 - Tabpage aggregation uses global tty positions
+    - Can tell whether any extmarks are currently drawn (and thus, whether a screen clear is needed)
     - Easier to cut down on redraws if only one window is scrolled
 - Hide text behind extmark with highlight
     - This is more difficult than it seems. 256-color terminals use `gui` highlights, which don't support `start=`/`stop=`

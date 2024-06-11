@@ -3,9 +3,9 @@
 -- Sixel drawing functionality, relative to the current window state.
 
 
-local sixel_raw = require "nvim_image_extmarks/sixel_raw"
-local interface = require "nvim_image_extmarks/interface"
-local blob_cache = require "nvim_image_extmarks/blob_cache"
+local sixel_raw = require "nvim_image_extmarks.sixel_raw"
+local interface = require "nvim_image_extmarks.interface"
+local blob_cache = require "nvim_image_extmarks.blob_cache"
 
 pcall(sixel_raw.get_tty)
 
@@ -27,6 +27,20 @@ local window_drawing = {
 ---@field start_line integer
 ---@field window_column integer
 ---@field start_column integer
+
+local function fire_pre_draw(extmarks)
+  local errored = pcall(function()
+    vim.api.nvim_exec_autocmds("User", {
+      group = "ImageExtmarks#pre_draw",
+      data = extmarks
+    })
+  end)
+  if errored then
+    vim.api.nvim_exec_autocmds("User", {
+      group = "ImageExtmarks#pre_draw",
+    })
+  end
+end
 
 
 ---@return window_dimensions
@@ -116,10 +130,7 @@ local function schedule_generate_blob(extmark, path)
           return
         end
 
-        vim.api.nvim_exec_autocmds("User", {
-          group="ImageExtmarks#pre_draw",
-          data={ extmark }
-        })
+        fire_pre_draw{ extmark }
 
         window_drawing.cache_and_draw_blob(blob, path, extmark, win)
         window_drawing.debounce[tostring(extmark.id)] = nil
@@ -313,10 +324,7 @@ function window_drawing.draw_blobs(extmarks, windims)
   )
 
   if window_drawing.enabled then
-    vim.api.nvim_exec_autocmds("User", {
-      group="ImageExtmarks#pre_draw",
-      data = extmarks
-    })
+    fire_pre_draw(extmarks)
     sixel_raw.draw_sixels(blobs)
   end
 end

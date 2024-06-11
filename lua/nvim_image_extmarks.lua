@@ -2,10 +2,10 @@
 --
 -- Functions providing a consistent interface to the management of sixel extmarks.
 
-local interface = require "nvim_image_extmarks/interface"
-local sixel_raw = require "nvim_image_extmarks/sixel_raw"
-local window_drawing = require "nvim_image_extmarks/window_drawing"
-local blob_cache = require "nvim_image_extmarks/blob_cache"
+local interface = require "nvim_image_extmarks.interface"
+local sixel_raw = require "nvim_image_extmarks.sixel_raw"
+local window_drawing = require "nvim_image_extmarks.window_drawing"
+local blob_cache = require "nvim_image_extmarks.blob_cache"
 
 local extmark_timer = nil
 assert(
@@ -15,67 +15,13 @@ assert(
   ),
   "g:image_extmarks_buffer_ms must be a number"
 )
-vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
-vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
-
-vim.api.nvim_create_autocmd(
-  {
-    "VimEnter",
-    "VimResized",
-    "WinResized",
-    "WinScrolled"
-  },
-  {
-    group = "ImageExtmarks",
-    callback = function() sixel_extmarks.redraw(true) end
-  }
-)
-
--- Vim quirk: attempting to redraw at TabEnter after TabNew will use the
--- previous buffer (but the new window), since BufEnter has not happened yet
---
--- So don't bother redrawing a new tab is created
-vim.api.nvim_create_autocmd(
-  "TabNew",
-  {
-    group = "ImageExtmarks",
-    callback = function() sixel_extmarks.creating_tab = true end
-  }
-)
-vim.api.nvim_create_autocmd(
-  {
-    "TabEnter",
-    "TabClosed"
-  },
-  {
-    group = "ImageExtmarks",
-    callback = function()
-      if sixel_extmarks.creating_tab ~= nil then
-        sixel_extmarks.creating_tab = nil
-        return
-      end
-
-      sixel_extmarks.redraw(true)
-    end
-  }
-)
-
-vim.api.nvim_create_autocmd(
-  {
-    "TabLeave",
-    "ExitPre"
-  },
-  {
-    group = "ImageExtmarks",
-    callback = function() sixel_extmarks.clear_screen() end
-  }
-)
 
 
 -- Namespace for plugin functions
 --
 ---@diagnostic disable-next-line
 sixel_extmarks = {}
+
 
 -- Add autocommands which depend on buffer contents and window positions
 --
@@ -112,8 +58,6 @@ local function bind_local_autocmds()
   })
   vim.b.bound_autocmds = true
 end
-
-
 
 
 -- Create a new image extmark in the current buffer.
@@ -334,17 +278,70 @@ function sixel_extmarks.dump_blob_cache()
 end
 
 
-local function create_image_command(opts)
-  sixel_extmarks.create(
-    opts.line1 - 1,
-    opts.line2 - 1,
-    opts.args
-  )
-end
-
-
 vim.api.nvim_create_user_command(
   'CreateImage',
-  create_image_command,
+  function(opts)
+    sixel_extmarks.create(
+      opts.line1 - 1,
+      opts.line2 - 1,
+      opts.args
+    )
+  end,
   { nargs = 1, range = 2, complete = "file" }
+)
+
+vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
+vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
+
+vim.api.nvim_create_autocmd(
+  {
+    "VimEnter",
+    "VimResized",
+    "WinResized",
+    "WinScrolled"
+  },
+  {
+    group = "ImageExtmarks",
+    callback = function() sixel_extmarks.redraw(true) end
+  }
+)
+
+-- Vim quirk: attempting to redraw at TabEnter after TabNew will use the
+-- previous buffer (but the new window), since BufEnter has not happened yet
+--
+-- So don't bother redrawing a new tab is created
+vim.api.nvim_create_autocmd(
+  "TabNew",
+  {
+    group = "ImageExtmarks",
+    callback = function() sixel_extmarks.creating_tab = true end
+  }
+)
+vim.api.nvim_create_autocmd(
+  {
+    "TabEnter",
+    "TabClosed"
+  },
+  {
+    group = "ImageExtmarks",
+    callback = function()
+      if sixel_extmarks.creating_tab ~= nil then
+        sixel_extmarks.creating_tab = nil
+        return
+      end
+
+      sixel_extmarks.redraw(true)
+    end
+  }
+)
+
+vim.api.nvim_create_autocmd(
+  {
+    "TabLeave",
+    "ExitPre"
+  },
+  {
+    group = "ImageExtmarks",
+    callback = function() sixel_extmarks.clear_screen() end
+  }
 )
