@@ -33,7 +33,7 @@ local function set_path_dict(id, path)
   end
 
   pcall(function()
-    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+    vim.cmd(("unlet b:image_extmark_to_error[%d]"):format(id))
   end)
 
   vim.cmd(("let b:image_extmark_to_path[%d] = '%s'"):format(
@@ -48,7 +48,7 @@ end
 ---@param error_text string|nil
 local function set_error_dict(id, error_text)
   if error_text == nil then
-    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+    pcall(function() vim.cmd(("unlet b:image_extmark_to_error[%d]"):format(id)) end)
     return
   end
 
@@ -167,10 +167,10 @@ end
 ---@param id integer
 function interface.remove_image_extmark(id)
   pcall(function()
-    vim.cmd(("unlet vim.b.image_extmark_to_path[%d]"):format(id))
+    vim.cmd(("unlet b:image_extmark_to_path[%d]"):format(id))
   end)
   pcall(function()
-    vim.cmd(("unlet vim.b.image_extmark_to_error[%d]"):format(id))
+    vim.cmd(("unlet b:image_extmark_to_error[%d]"):format(id))
   end)
 
   return vim.api.nvim_buf_del_extmark(

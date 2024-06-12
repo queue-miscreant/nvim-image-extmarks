@@ -92,7 +92,7 @@ end
 ---@param error_text string The error text to display
 ---@return integer
 function sixel_extmarks.create_error(start_row, end_row, error_text)
-  return interface.create_error_extmark(start_row, end_row, error_text)
+  return interface.create_error(start_row, end_row, error_text)
 end
 
 
