@@ -52,9 +52,9 @@ local function set_error_dict(id, error_text)
     return
   end
 
-  vim.cmd(("let b:image_extmark_to_error[%d] = '%s'"):format(
+  vim.cmd(("let b:image_extmark_to_error[%d] = \"%s\""):format(
     id,
-    vim.fn.escape(error_text:gsub("\n", "\\n"), "'\\")
+    vim.fn.escape(error_text:gsub("\n", "\\n"), "\"\\")
   ))
 end
 
