@@ -164,12 +164,12 @@ function sixel_raw.blobify(
   -- Run ImageMagick command
   local sixel = {}
   stdout:read_start(function(err, data)
-      assert(not err, err)
-      if data == nil then
-        callback(table.concat(sixel, ""))
-        return
-      end
-      table.insert(sixel, data)
+    assert(not err, err)
+    if data == nil then
+      callback(table.concat(sixel, ""))
+      return
+    end
+    table.insert(sixel, data)
   end)
 
   local erro = ""
