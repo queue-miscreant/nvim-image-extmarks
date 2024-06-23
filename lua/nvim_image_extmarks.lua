@@ -194,46 +194,87 @@ function sixel_extmarks.redraw(force)
   end
 
   local windows = vim.api.nvim_tabpage_list_wins(0)
-  local need_update = {}
 
-  for _, window in pairs(windows) do
-    local updates = vim.api.nvim_win_call(window, function()
-      return {window, window_drawing.extmarks_needing_update(force)}
-    end)
-    if updates[2] ~= nil and #updates[2] > 0 then
-      table.insert(need_update, updates)
-    end
+  local previous_extmarks = vim.t.previous_extmarks
+  if previous_extmarks == nil then
+    previous_extmarks = {}
   end
 
-  if #need_update == 0 then return end
+  local need_clear = false
+  local new_extmarks = {}
+  local new_count = 0
 
-  if vim.g.image_extmarks_buffer_ms == nil then
-    for _, window_extmarks in pairs(need_update) do
-      vim.api.nvim_win_call(window_extmarks[1], function()
-        window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
-      end)
-    end
+  ---@type [integer, global_extmark[]][]
+  local need_update = vim.tbl_map(function(window)
+    return vim.api.nvim_win_call(window, function()
+      local extmarks_to_draw, need_clear_window = window_drawing.extmarks_needing_update(
+        force or false
+      )
+      need_clear = need_clear or need_clear_window
+
+      local lazy_extmarks_to_draw = {}
+
+      for _, extmark in pairs(extmarks_to_draw) do
+        local cache_entry = window_drawing.extmark_cache_entry(window, extmark.extmark)
+        new_extmarks[cache_entry] = true
+
+        -- Add to the lazy list if we didn't draw it previously
+        if previous_extmarks[cache_entry] == nil then
+          table.insert(lazy_extmarks_to_draw, extmark)
+          new_count = new_count + 1
+        end
+      end
+
+      ---@type [integer, global_extmark[], global_extmark[]]
+      return { window, extmarks_to_draw, lazy_extmarks_to_draw }
+    end)
+  end, windows)
+
+  for cache_entry, _ in pairs(previous_extmarks) do
+    -- If we're not drawing an extmark that was drawn previously, clear the screen
+    need_clear = need_clear or new_extmarks[cache_entry] == nil
+  end
+
+  local timer = vim.g.image_extmarks_buffer_ms or 0
+  if need_clear then
+    sixel_raw.clear_screen()
+  -- Nothing to draw
+  elseif new_count == 0 then
     return
+  else
+    timer = 0
+  end
+
   -- "Renew" the timer by cancelling it first
-  elseif extmark_timer ~= nil then
+  if extmark_timer ~= nil then
     pcall(function()
       extmark_timer:stop()
       extmark_timer:close()
     end)
   end
-  sixel_raw.clear_screen()
+
   extmark_timer = vim.loop.new_timer()
   extmark_timer:start(
-    vim.g.image_extmarks_buffer_ms,
+    timer,
     0,
     vim.schedule_wrap(function()
-      extmark_timer:stop()
-      extmark_timer:close()
+      pcall(function()
+        extmark_timer:stop()
+        extmark_timer:close()
+      end)
+
       for _, window_extmarks in pairs(need_update) do
         vim.api.nvim_win_call(window_extmarks[1], function()
-          window_drawing.draw_blobs(window_extmarks[2], vim.w.vim_image_window_cache)
+          -- Draw all if screen cleared, else only new
+          if sixel_raw.screen_cleared then
+            window_drawing.draw_blobs(window_extmarks[2])
+          else
+            window_drawing.draw_blobs(window_extmarks[3])
+          end
         end)
       end
+
+      vim.t.previous_extmarks = new_extmarks
     end)
   )
 end

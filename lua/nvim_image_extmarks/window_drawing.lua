@@ -47,9 +47,11 @@ end
 -- This is the identifier (extmark_id) along with data which can change as windows move
 -- around, such as crops.
 --
+---@param window_id integer
 ---@param extmark wrapped_extmark
-local function extmark_cache_entry(extmark)
-  return ("%d.%d.%d"):format(
+function window_drawing.extmark_cache_entry(window_id, extmark)
+  return ("%d.%d.%d.%d"):format(
+    window_id,
     extmark.id,
     extmark.crop_row_start,
     extmark.crop_row_end
@@ -62,11 +64,11 @@ local function get_windims()
   local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
 
   return {
-      top_line = wininfo[1].topline,     -- top line of buffer
-      bottom_line = wininfo[1].botline,  -- bottom line of buffer
-      start_line = wininfo[1].winrow,    -- start row of current tabpage
-      window_column = wininfo[1].wincol, -- start column of current tabpage
-      start_column = wininfo[1].textoff, -- sign/number column offset
+    top_line = wininfo[1].topline,     -- top line of buffer
+    bottom_line = wininfo[1].botline,  -- bottom line of buffer
+    start_line = wininfo[1].winrow,    -- start row of current tabpage
+    window_column = wininfo[1].wincol, -- start column of current tabpage
+    start_column = wininfo[1].textoff, -- sign/number column offset
   }
 end
 
@@ -83,38 +85,22 @@ local function window_to_terminal(start_row, windims)
   local row = windims.start_line + row_offset - 1
   local column = windims.window_column + windims.start_column
 
-    return { row, column }
+  return { row, column }
 end
 
 
----@param blob string
----@param path string
----@param extmark wrapped_extmark
-function window_drawing.cache_and_draw_blob(blob, path, extmark, window)
-  blob_cache.insert(blob, path, extmark)
-
-  vim.api.nvim_win_call(window, function()
-    local windims = get_windims()
-    sixel_raw.draw_sixel(
-      blob,
-      window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
-    )
-  end)
-end
-
-
----@param extmark wrapped_extmark
+---@param extmark global_extmark
 ---@param path string
 local function schedule_generate_blob(extmark, path)
   local win = vim.api.nvim_get_current_win()
   local debounce = window_drawing.debounce[
-    tostring(win) .. "." .. tostring(extmark.id)
+    tostring(win) .. "." .. tostring(extmark.extmark.id)
   ]
   local has_same_data = (
     debounce ~= nil
-    and debounce.extmark.height == extmark.height
-    and debounce.extmark.crop_row_start == extmark.crop_row_start
-    and debounce.extmark.crop_row_end == extmark.crop_row_end
+    and debounce.extmark.height == extmark.extmark.height
+    and debounce.extmark.crop_row_start == extmark.extmark.crop_row_start
+    and debounce.extmark.crop_row_end == extmark.extmark.crop_row_end
   )
 
   -- don't bother if we have a proces with identical parameters (size, crop) running
@@ -124,37 +110,46 @@ local function schedule_generate_blob(extmark, path)
 
   if debounce == nil then
     debounce = {
-      extmark = extmark,
+      extmark = extmark.extmark,
       draw_number = 0
     }
   else
     debounce = {
-      extmark = extmark,
+      extmark = extmark.extmark,
       draw_number = debounce.draw_number + 1
     }
   end
-  window_drawing.debounce[tostring(extmark.id)] = debounce
+  window_drawing.debounce[
+    tostring(win) .. "." .. tostring(extmark.extmark.id)
+  ] = debounce
 
   sixel_raw.blobify(
-    extmark,
+    extmark.extmark,
     path,
     function(blob)
       vim.defer_fn(function()
-        if debounce.draw_number ~= window_drawing.debounce[tostring(extmark.id)].draw_number then
+        if debounce.draw_number ~= window_drawing.debounce[
+          tostring(win) .. "." .. tostring(extmark.extmark.id)
+        ].draw_number then
           return
         end
 
         fire_pre_draw{ extmark }
 
-        window_drawing.cache_and_draw_blob(blob, path, extmark, win)
-        window_drawing.debounce[tostring(extmark.id)] = nil
+        blob_cache.insert(blob, path, extmark.extmark)
+
+        sixel_raw.draw_sixel(
+          blob,
+          { extmark.x, extmark.y }
+        )
+        window_drawing.debounce[tostring(extmark.extmark.id)] = nil
       end, 0)
     end,
     function(error)
       if error == nil then return end
       vim.defer_fn(function()
         interface.set_extmark_error(
-          extmark.id,
+          extmark.extmark.id,
           error
         )
       end, 0)
@@ -213,16 +208,15 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
 end
 
 
----@param extmark wrapped_extmark
----@param windims window_dimensions
+---@param extmark global_extmark
 ---@return [string, [number, number]] | nil
-local function lookup_or_generate_blob(extmark, windims)
-  local error = vim.b.image_extmark_to_error[tostring(extmark.id)]
-  local path = vim.b.image_extmark_to_path[tostring(extmark.id)]
+local function lookup_or_generate_blob(extmark)
+  local error = vim.b.image_extmark_to_error[tostring(extmark.extmark.id)]
+  local path = vim.b.image_extmark_to_path[tostring(extmark.extmark.id)]
 
   if error ~= nil then
     interface.set_extmark_error(
-      extmark.id,
+      extmark.extmark.id,
       error,
       false
     )
@@ -230,7 +224,7 @@ local function lookup_or_generate_blob(extmark, windims)
   end
   if path == nil then
     interface.set_extmark_error(
-      extmark.id,
+      extmark.extmark.id,
       "Could not match extmark to content!"
     )
     return nil
@@ -240,21 +234,21 @@ local function lookup_or_generate_blob(extmark, windims)
   vim.api.nvim_buf_set_extmark(
     0,
     interface.namespace,
-    extmark.start_row,
+    extmark.extmark.start_row,
     0,
     {
-      id = extmark.id,
-      end_row = extmark.end_row
+      id = extmark.extmark.id,
+      end_row = extmark.extmark.end_row
     }
   )
 
-  local cache_lookup = blob_cache.get(path, extmark)
+  local cache_lookup = blob_cache.get(path, extmark.extmark)
 
   if cache_lookup == nil then
     -- Try to find the file
     if vim.fn.filereadable(path) == 0 then
       interface.set_extmark_error(
-        extmark.id,
+        extmark.extmark.id,
         ("Cannot read file `%s`!"):format(path)
       )
       return nil
@@ -266,7 +260,7 @@ local function lookup_or_generate_blob(extmark, windims)
 
   return {
     cache_lookup,
-    window_to_terminal(extmark.start_row + extmark.crop_row_start, windims)
+    { extmark.x, extmark.y }
   }
 end
 
@@ -277,57 +271,14 @@ end
 ---@field y integer
 
 
----@param previous_extmarks {[string]: global_extmark}
 ---@param force boolean
----@return (wrapped_extmark | nil)[] | nil
-function window_drawing.extmarks_needing_update_new(force)
-  -- Get current cache
-  local line_cache = vim.w.vim_image_line_cache
-  local window_cache = vim.w.vim_image_window_cache
-  local drawing_cache = vim.w.vim_image_extmark_cache
-
-  local new_dims = get_windims()
-  local new_line = vim.fn.line("$")
-
-  -- Try getting the visible extmarks, since the cache seems valid
-  local extmarks = vim.tbl_values(
-    window_drawing.get_visible_extmarks(
-      new_dims.top_line - 1,
-      new_dims.bottom_line - 1
-    )
-  )
-  local new_extmark = table.concat(
-    vim.tbl_map(function(extmark) return extmark.id or "" end, extmarks),
-    ","
-  )
-
-  if window_drawing.just_enabled then
-    window_drawing.just_enabled = false
-  elseif
-    not force
-    and vim.deep_equal(new_dims, window_cache) -- Window has not moved
-    and line_cache == vim.fn.line("$") -- No lines have been added
-    and new_extmark == drawing_cache -- And the same extmarks will be drawn
-  then
-    -- No need to redraw, same extmarks visible as before
-    return nil
-  end
-
-  -- Update cache
-  vim.w.vim_image_extmark_cache = new_extmark
-  vim.w.vim_image_window_cache = new_dims
-  vim.w.vim_image_line_cache = new_line
-
-  return extmarks
-end
-
-
----@return (wrapped_extmark | nil)[] | nil
+---@return global_extmark[], boolean
 function window_drawing.extmarks_needing_update(force)
+  local window_id = vim.fn.win_getid()
+
   -- Get current cache
   local line_cache = vim.w.vim_image_line_cache
   local window_cache = vim.w.vim_image_window_cache
-  local drawing_cache = vim.w.vim_image_extmark_cache
 
   local new_dims = get_windims()
   local new_line = vim.fn.line("$")
@@ -339,39 +290,41 @@ function window_drawing.extmarks_needing_update(force)
       new_dims.bottom_line - 1
     )
   )
-  local new_extmark = table.concat(
-    vim.tbl_map(function(extmark) return extmark.id or "" end, extmarks),
-    ","
-  )
-
-  if window_drawing.just_enabled then
-    window_drawing.just_enabled = false
-  elseif
-    not force
-    and vim.deep_equal(new_dims, window_cache) -- Window has not moved
-    and line_cache == vim.fn.line("$") -- No lines have been added
-    and new_extmark == drawing_cache -- And the same extmarks will be drawn
-  then
-    -- No need to redraw, same extmarks visible as before
-    return nil
-  end
 
   -- Update cache
-  vim.w.vim_image_extmark_cache = new_extmark
   vim.w.vim_image_window_cache = new_dims
   vim.w.vim_image_line_cache = new_line
 
-  return extmarks
+  -- TODO: move this outside this function
+  if window_drawing.just_enabled then
+    window_drawing.just_enabled = false
+  end
+
+  local need_clear = force
+    or not vim.deep_equal(new_dims, window_cache) -- Window has moved
+    or line_cache ~= vim.fn.line("$") -- Lines have been added
+
+  ---@type global_extmark[]
+  local global_extmarks = vim.tbl_map(function(extmark)
+    ---@cast extmark wrapped_extmark
+
+    local x, y = unpack(  ---@diagnostic disable-line
+      window_to_terminal(extmark.start_row + extmark.crop_row_start, new_dims)
+    )
+
+    return {
+      extmark = extmark,
+      x = x,
+      y = y,
+    } --[[@as global_extmark]]
+  end, extmarks)
+
+  return global_extmarks, need_clear
 end
 
 
----@param extmarks (wrapped_extmark | nil)[]
----@param windims window_dimensions
-function window_drawing.draw_blobs(extmarks, windims)
-  if window_drawing.enabled then
-    sixel_raw.clear_screen()
-  end
-
+---@param extmarks (global_extmark | nil)[]
+function window_drawing.draw_blobs(extmarks)
   if vim.b.image_extmark_to_path == nil then
     vim.b.image_extmark_to_path = vim.empty_dict()
   end
@@ -381,10 +334,10 @@ function window_drawing.draw_blobs(extmarks, windims)
   end
 
   local blobs = vim.tbl_map(
-    function(extmark) return lookup_or_generate_blob(
-      extmark,
-      windims
-    ) end,
+    function(extmark)
+      ---@cast extmark global_extmark
+      return lookup_or_generate_blob(extmark)
+    end,
     extmarks
   )
 
