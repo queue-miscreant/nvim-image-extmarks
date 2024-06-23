@@ -267,6 +267,8 @@ function sixel_extmarks.redraw(force)
       end)
 
       for _, window_extmarks in pairs(need_update) do
+        -- Ephemeral windows from external plugins
+        if not vim.api.nvim_win_is_valid(window_extmarks[1]) then goto continue end
         vim.api.nvim_win_call(window_extmarks[1], function()
           -- Draw all if screen cleared, else only new
           if sixel_raw.screen_cleared then
@@ -275,6 +277,7 @@ function sixel_extmarks.redraw(force)
             window_drawing.draw_blobs(window_extmarks[3])
           end
         end)
+        ::continue::
       end
     end)
   )
@@ -336,9 +339,7 @@ vim.api.nvim_create_augroup("ImageExtmarks", { clear = false })
 vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
 
 vim.api.nvim_create_autocmd(
-  {
-    "WinScrolled",
-  },
+  "WinScrolled",
   {
     group = "ImageExtmarks",
     callback = function() sixel_extmarks.redraw() end
@@ -346,10 +347,31 @@ vim.api.nvim_create_autocmd(
 )
 
 vim.api.nvim_create_autocmd(
+  "WinResized",
+  {
+    group = "ImageExtmarks",
+    callback = function()
+      local total = 0
+      for _, win in pairs(vim.v.event.windows) do
+        total = total + #vim.api.nvim_buf_get_extmarks(
+          vim.api.nvim_win_get_buf(win),
+          interface.namespace,
+          0,
+          -1,
+          {}
+        )
+      end
+      if total > 0 then
+        sixel_extmarks.redraw(true)
+      end
+    end
+  }
+)
+
+vim.api.nvim_create_autocmd(
   {
     "VimEnter",
     "VimResized",
-    "WinResized",
   },
   {
     group = "ImageExtmarks",
