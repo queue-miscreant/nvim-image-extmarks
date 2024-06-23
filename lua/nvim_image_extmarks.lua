@@ -238,12 +238,15 @@ function sixel_extmarks.redraw(force)
   local timer = vim.g.image_extmarks_buffer_ms or 0
   if need_clear then
     sixel_raw.clear_screen()
-  -- Nothing to draw
+  -- Nothing to draw, and not about to draw
   elseif new_count == 0 then
     return
-  else
+  elseif extmark_timer == nil then
     timer = 0
   end
+
+  -- Update the drawn extmarks now, for future redraws
+  vim.t.previous_extmarks = new_extmarks
 
   -- "Renew" the timer by cancelling it first
   if extmark_timer ~= nil then
@@ -252,8 +255,8 @@ function sixel_extmarks.redraw(force)
       extmark_timer:close()
     end)
   end
-
   extmark_timer = vim.loop.new_timer()
+
   extmark_timer:start(
     timer,
     0,
@@ -273,8 +276,6 @@ function sixel_extmarks.redraw(force)
           end
         end)
       end
-
-      vim.t.previous_extmarks = new_extmarks
     end)
   )
 end
@@ -336,10 +337,19 @@ vim.api.nvim_create_augroup("ImageExtmarks#pre_draw", { clear = false })
 
 vim.api.nvim_create_autocmd(
   {
+    "WinScrolled",
+  },
+  {
+    group = "ImageExtmarks",
+    callback = function() sixel_extmarks.redraw() end
+  }
+)
+
+vim.api.nvim_create_autocmd(
+  {
     "VimEnter",
     "VimResized",
     "WinResized",
-    "WinScrolled"
   },
   {
     group = "ImageExtmarks",

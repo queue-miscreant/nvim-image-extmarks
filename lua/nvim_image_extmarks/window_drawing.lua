@@ -274,8 +274,6 @@ end
 ---@param force boolean
 ---@return global_extmark[], boolean
 function window_drawing.extmarks_needing_update(force)
-  local window_id = vim.fn.win_getid()
-
   -- Get current cache
   local line_cache = vim.w.vim_image_line_cache
   local window_cache = vim.w.vim_image_window_cache
@@ -301,8 +299,10 @@ function window_drawing.extmarks_needing_update(force)
   end
 
   local need_clear = force
-    or not vim.deep_equal(new_dims, window_cache) -- Window has moved
-    or line_cache ~= vim.fn.line("$") -- Lines have been added
+    or #extmarks > 0 and (
+      not vim.deep_equal(new_dims, window_cache) -- Window has moved
+      or line_cache ~= vim.fn.line("$") -- Lines have been added
+    )
 
   ---@type global_extmark[]
   local global_extmarks = vim.tbl_map(function(extmark)

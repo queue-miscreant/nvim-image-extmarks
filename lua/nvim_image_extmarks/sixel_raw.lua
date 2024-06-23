@@ -65,8 +65,7 @@ end
 ---@param winpos [integer, integer]
 function sixel_raw.draw_sixel(blob, winpos)
   if sixel_raw.tty == nil then
-    vim.notify("Could not find the terminal device!", 3, {})
-    return
+    sixel_raw.get_tty()
   end
 
   pcall(function()

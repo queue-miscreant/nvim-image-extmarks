@@ -252,9 +252,9 @@ Autocmds
 `autocmd`s which are used by the plugin live under the group `ImageExtmarks`.
 These include:
 
-- `CursorMoved`, `TabEnter`, `TabClosed`, `TextChanged`, `TextChangedI`
+- `CursorMoved`, `TabEnter`, `TabClosed`, `TextChanged`, `TextChangedI`, `WinScrolled`
     - Attempt to redraw, if necessary
-- `WinResized`, `WinScrolled`, `VimEnter`, `VimResized`
+- `WinResized`, `VimEnter`, `VimResized`
     - Force redraw
 - `TabLeave`, `ExitPre`
     - Clear the screen of all sixel images
@@ -276,9 +276,6 @@ TODOs
 -----
 
 - Images crop to window width
-- Tabpage aggregation uses global tty positions
-    - Can tell whether any extmarks are currently drawn (and thus, whether a screen clear is needed)
-    - Easier to cut down on redraws if only one window is scrolled
 - Hide text behind extmark with highlight
     - This is more difficult than it seems. 256-color terminals use `gui` highlights, which don't support `start=`/`stop=`
 - Improve display after Ex command with multiline output?
