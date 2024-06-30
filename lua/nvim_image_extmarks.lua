@@ -84,6 +84,30 @@ function sixel_extmarks.create(start_row, end_row, path)
 end
 
 
+-- Create a new image extmark in the current buffer.
+--
+---@param start_row integer The (0-indexed) row of the buffer that the image begins on
+---@param height integer The height of the extmark
+---@param path string A path to the file content
+---@return integer
+function sixel_extmarks.create_virtual(start_row, height, path)
+  local id = interface.create_image_virtual(start_row, height, path)
+
+  -- Bind extmarks if we need to
+  if (
+    vim.b.image_extmark_to_path ~= nil and
+    vim.tbl_count(vim.b.image_extmark_to_path) > 0 and
+    not vim.b.bound_autocmds
+  ) then
+    bind_local_autocmds()
+  end
+
+  sixel_extmarks.redraw()
+
+  return id
+end
+
+
 -- Create an "image" extmark in the current buffer which displays an error,
 -- but can be updated later to hold an image.
 --

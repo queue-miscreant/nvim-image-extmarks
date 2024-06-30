@@ -8,7 +8,8 @@ local ffi = require "ffi"
 ---@class wrapped_extmark
 ---@field id integer
 ---@field start_row integer
----@field end_row integer
+---@field end_row? integer
+---@field virt_lines? [string, string][][]
 ---@field height integer
 ---@field crop_row_start integer
 ---@field crop_row_end integer

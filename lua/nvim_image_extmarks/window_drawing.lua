@@ -79,18 +79,19 @@ end
 
 
 -- Convert window coordinates (start_row, end_row) to terminal coordinates
----@param start_row integer The row of the buffer to start drawing on
+---@param extmark wrapped_extmark The row of the buffer to start drawing on
 ---@param windims window_dimensions The current dimensions of the window
 ---@return [integer, integer]
-local function window_to_terminal(start_row, windims)
+local function window_to_terminal(extmark, windims)
   -- default row, for things at the very top of the screen
   local row = 1
+  local start_row = extmark.start_row + extmark.crop_row_start
   if start_row >= windims.topline then
     local row_offset = vim.api.nvim_win_text_height(
       0,
       { start_row = windims.topline, end_row = start_row }
     ).all
-    row = windims.winrow + windims.topfill + row_offset - 1
+    row = windims.winrow + windims.topfill + row_offset - (extmark.virt_lines == nil and 0 or -1)
   end
   local column = windims.wincol + windims.textoff
 
@@ -168,9 +169,10 @@ end
 
 
 ---@param extmark any Raw extmark object that I don't care to type
----@param cursor_line integer Current cursor position
 ---@param windims window_dimensions Window dimensions
-local function inline_extmark(extmark, cursor_line, windims)
+---@param cursor_line integer Current cursor position
+---@return wrapped_extmark | nil
+local function inline_extmark(extmark, windims, cursor_line)
   local start_row, end_row = extmark[2], extmark[4].end_row
 
   -- Not on screen
@@ -208,7 +210,7 @@ local function inline_extmark(extmark, cursor_line, windims)
     height = height,
     crop_row_start = crop_row_start,
     crop_row_end = crop_row_end,
-  }
+  } --[[ as wrapped_extmark]]
 end
 
 
@@ -269,10 +271,11 @@ local function virt_lines_extmark(extmark, windims)
   return {
     id = extmark[1],
     start_row = start_row,
-    height = height,
+    height = height - 1,
+    virt_lines = extmark[4].virt_lines,
     crop_row_start = crop_row_start,
     crop_row_end = crop_row_end,
-  }
+  } --[[ as wrapped_extmark]]
 end
 
 
@@ -292,7 +295,7 @@ function window_drawing.get_visible_extmarks(dims)
     if extmark[4].virt_lines ~= nil then
       return virt_lines_extmark(extmark, dims)
     else
-      return inline_extmark(extmark, cursor_line, dims)
+      return inline_extmark(extmark, dims, cursor_line)
     end
   end, extmarks)
 end
@@ -328,6 +331,7 @@ local function lookup_or_generate_blob(extmark)
     0,
     {
       id = extmark.extmark.id,
+      virt_lines = extmark.extmark.virt_lines,
       end_row = extmark.extmark.end_row
     }
   )
@@ -396,7 +400,7 @@ function window_drawing.extmarks_needing_update(force)
     ---@cast extmark wrapped_extmark
 
     local x, y = unpack(  ---@diagnostic disable-line
-      window_to_terminal(extmark.start_row + extmark.crop_row_start, new_dims)
+      window_to_terminal(extmark, new_dims)
     )
 
     return {

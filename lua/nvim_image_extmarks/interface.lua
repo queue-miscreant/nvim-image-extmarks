@@ -86,6 +86,38 @@ function interface.create_image(start_row, end_row, path)
 end
 
 
+---@param start_row integer
+---@param height integer
+---@param path string
+---@return integer
+function interface.create_image_virtual(start_row, height, path)
+  local virt_lines = {}
+  for _ = 1, height do
+    table.insert(virt_lines, {{"", ""}})
+  end
+
+  local id = vim.api.nvim_buf_set_extmark(
+    0,
+    interface.namespace,
+    start_row,
+    0,
+    { virt_lines = virt_lines }
+  )
+
+  if vim.b.image_extmark_to_path == nil then
+    vim.b.image_extmark_to_path = vim.empty_dict()
+  end
+
+  if not set_path_dict(id, path) then
+    interface.set_extmark_error(
+      id,
+      ("Cannot read file `%s`!"):format(path)
+    )
+  end
+  return id
+end
+
+
 ---@param start_row integer The (0-indexed) row of the buffer that the image would end on
 ---@param end_row integer The (0-indexed) row of the buffer that the image would end on
 ---@param error_text string The error text to display
