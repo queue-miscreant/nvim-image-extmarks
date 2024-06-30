@@ -275,6 +275,7 @@ before drawing sixel blobs.
 TODOs
 -----
 
+- virtual_lines-based images
 - Images crop to window width
 - Hide text behind extmark with highlight
     - This is more difficult than it seems. 256-color terminals use `gui` highlights, which don't support `start=`/`stop=`

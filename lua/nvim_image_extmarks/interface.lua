@@ -23,6 +23,110 @@ else
   path_normalizer = vim.fn.expandcmd
 end
 
+---@class extmark_parameters
+---@field path string|nil
+---@field error string|nil
+---@field inline boolean
+
+---@param id integer
+---@param dict_value extmark_parameters
+function interface.set_dict(id, dict_value)
+  path = path_normalizer(path)
+  return vim.fn.filereadable(path) == 0
+
+  pcall(function()
+    vim.cmd(("unlet b:image_extmark_to_error[%d]"):format(id))
+  end)
+
+  vim.cmd(("let b:image_extmark_to_path[%d] = '%s'"):format(
+    id,
+    vim.fn.escape(path, "'\\")
+  ))
+  return true
+end
+
+extmark_params = {
+  new = function(self, data)
+    assert(data.buffer ~= nil, "Extmark parameters object does not have buffer ID!")
+    assert(data.id ~= nil, "Extmark parameters object does not have extmark ID!")
+    assert(data.path ~= nil or data.error ~= nil, "Extmark parameters object needs one of `path` or `error`!")
+
+    self.data = {
+      buffer = data.buffer,
+      id = data.id,
+      path = data.path,
+      error = data.error,
+      inline = data.inline or false,
+    }
+
+    local ret = {}
+    setmetatable(ret, self)
+    return ret
+  end,
+  __index = function(self, key)
+    if key == "data" then return rawget(self, "data") end
+    return rawget(self, "data")[key]
+  end,
+  __newindex = function(self, key, value)
+    local field = rawget(self, "data")
+    field[key] = value
+
+    assert(
+      field.buffer == vim.api.nvim_get_current_buf(),
+      "Attempted to set data on an extmark while outside its buffer!"
+    )
+
+    if type(value) == "nil" then
+      vim.cmd(("unlet b:image_extmark_to_error[%d]['%s']"):format(
+        field.id,
+        key
+      ))
+      return
+    end
+
+    if type(value) == "string" then
+      value = '"' .. vim.fn.escape(value:gsub("\n", "\\n"), "\"\\") .. '"'
+    elseif type(value) == "boolean" then
+      value = "v:" .. value
+    end
+
+    vim.cmd(("let b:image_extmark_to_error[%d]['%s'] = %s"):format(
+      field.id,
+      key,
+      value
+    ))
+  end
+}
+
+
+---@param id integer
+---@return extmark_parameters|nil
+function interface.get_parameters(id)
+  if vim.b.image_extmark_params == nil then
+    vim.b.image_extmark_params = {}
+    return nil
+  end
+
+  local params = vim.b.image_extmark_params[tostring(id)]
+  return extmark_params:new(params)
+end
+
+
+---@return extmark_parameters[]
+function interface.get_all_parameters()
+  if vim.b.image_extmark_params == nil then
+    vim.b.image_extmark_params = {}
+    return {}
+  end
+
+  return vim.tbl_map(
+    function(params)
+      return extmark_params:new(params)
+    end,
+    vim.b.image_extmark_params
+  )
+end
+
 ---@param id integer
 ---@param path string
 ---@return boolean
