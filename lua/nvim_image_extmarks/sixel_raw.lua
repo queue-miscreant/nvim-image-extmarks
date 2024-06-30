@@ -5,14 +5,17 @@
 
 local ffi = require "ffi"
 
----@class wrapped_extmark
+---@class extmark_details
 ---@field id integer
----@field start_row integer
 ---@field end_row? integer
 ---@field virt_lines? [string, string][][]
+
+---@class wrapped_extmark
+---@field start_row integer
 ---@field height integer
 ---@field crop_row_start integer
 ---@field crop_row_end integer
+---@field details extmark_details
 
 local sixel_raw = {
   tty = nil,

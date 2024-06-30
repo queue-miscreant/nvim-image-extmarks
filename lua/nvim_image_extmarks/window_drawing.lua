@@ -45,7 +45,7 @@ end
 function window_drawing.extmark_cache_entry(window_id, extmark)
   return ("%d.%d.%d.%d"):format(
     window_id,
-    extmark.id,
+    extmark.details.id,
     extmark.crop_row_start,
     extmark.crop_row_end
   )
@@ -91,7 +91,7 @@ local function window_to_terminal(extmark, windims)
       0,
       { start_row = windims.topline, end_row = start_row }
     ).all
-    row = windims.winrow + windims.topfill + row_offset - (extmark.virt_lines == nil and 0 or -1)
+    row = windims.winrow + windims.topfill + row_offset + (extmark.details.virt_lines == nil and 0 or 1)
   end
   local column = windims.wincol + windims.textoff
 
@@ -104,7 +104,7 @@ end
 local function schedule_generate_blob(extmark, path)
   local win = vim.api.nvim_get_current_win()
   local debounce = window_drawing.debounce[
-    tostring(win) .. "." .. tostring(extmark.extmark.id)
+    tostring(win) .. "." .. tostring(extmark.extmark.details.id)
   ]
   local has_same_data = (
     debounce ~= nil
@@ -118,6 +118,7 @@ local function schedule_generate_blob(extmark, path)
     return
   end
 
+  --TODO: this is VERY bad. Blobbing should only happen rarely, but many can happen for the same parameters
   if debounce == nil then
     debounce = {
       extmark = extmark.extmark,
@@ -130,7 +131,7 @@ local function schedule_generate_blob(extmark, path)
     }
   end
   window_drawing.debounce[
-    tostring(win) .. "." .. tostring(extmark.extmark.id)
+    tostring(win) .. "." .. tostring(extmark.extmark.details.id)
   ] = debounce
 
   sixel_raw.blobify(
@@ -139,7 +140,7 @@ local function schedule_generate_blob(extmark, path)
     function(blob)
       vim.defer_fn(function()
         if debounce.draw_number ~= window_drawing.debounce[
-          tostring(win) .. "." .. tostring(extmark.extmark.id)
+          tostring(win) .. "." .. tostring(extmark.extmark.details.id)
         ].draw_number then
           return
         end
@@ -152,14 +153,14 @@ local function schedule_generate_blob(extmark, path)
           blob,
           { extmark.x, extmark.y }
         )
-        window_drawing.debounce[tostring(extmark.extmark.id)] = nil
+        window_drawing.debounce[tostring(extmark.extmark.details.id)] = nil
       end, 0)
     end,
     function(error)
       if error == nil then return end
       vim.defer_fn(function()
         interface.set_extmark_error(
-          extmark.extmark.id,
+          extmark.extmark.details.id,
           error
         )
       end, 0)
@@ -203,14 +204,15 @@ local function inline_extmark(extmark, windims, cursor_line)
   ).all - 1
   if crop_row_end == height then return nil end
 
+  extmark[4].id = extmark[1]
+  extmark[4].ns_id = nil
   return {
-    id = extmark[1],
     start_row = start_row,
-    end_row = end_row,
     height = height,
     crop_row_start = crop_row_start,
     crop_row_end = crop_row_end,
-  } --[[ as wrapped_extmark]]
+    details = extmark[4]
+  } --[[@as wrapped_extmark]]
 end
 
 
@@ -268,14 +270,15 @@ local function virt_lines_extmark(extmark, windims)
   end
   if crop_row_end == height then return nil end
 
+  extmark[4].id = extmark[1]
+  extmark[4].ns_id = nil
   return {
-    id = extmark[1],
     start_row = start_row,
     height = height - 1,
-    virt_lines = extmark[4].virt_lines,
     crop_row_start = crop_row_start,
     crop_row_end = crop_row_end,
-  } --[[ as wrapped_extmark]]
+    details = extmark[4]
+  } --[[@as wrapped_extmark]]
 end
 
 
@@ -304,12 +307,12 @@ end
 ---@param extmark global_extmark
 ---@return [string, [number, number]] | nil
 local function lookup_or_generate_blob(extmark)
-  local error = vim.b.image_extmark_to_error[tostring(extmark.extmark.id)]
-  local path = vim.b.image_extmark_to_path[tostring(extmark.extmark.id)]
+  local error = vim.b.image_extmark_to_error[tostring(extmark.extmark.details.id)]
+  local path = vim.b.image_extmark_to_path[tostring(extmark.extmark.details.id)]
 
   if error ~= nil then
     interface.set_extmark_error(
-      extmark.extmark.id,
+      extmark.extmark.details.id,
       error,
       false
     )
@@ -317,7 +320,7 @@ local function lookup_or_generate_blob(extmark)
   end
   if path == nil then
     interface.set_extmark_error(
-      extmark.extmark.id,
+      extmark.extmark.details.id,
       "Could not match extmark to content!"
     )
     return nil
@@ -329,11 +332,7 @@ local function lookup_or_generate_blob(extmark)
     interface.namespace,
     extmark.extmark.start_row,
     0,
-    {
-      id = extmark.extmark.id,
-      virt_lines = extmark.extmark.virt_lines,
-      end_row = extmark.extmark.end_row
-    }
+    extmark.extmark.details
   )
 
   local cache_lookup = blob_cache.get(path, extmark.extmark)
@@ -342,7 +341,7 @@ local function lookup_or_generate_blob(extmark)
     -- Try to find the file
     if vim.fn.filereadable(path) == 0 then
       interface.set_extmark_error(
-        extmark.extmark.id,
+        extmark.extmark.details.id,
         ("Cannot read file `%s`!"):format(path)
       )
       return nil
