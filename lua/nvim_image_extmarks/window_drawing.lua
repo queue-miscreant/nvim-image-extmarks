@@ -22,6 +22,7 @@ local window_drawing = {
 
 
 ---@class window_dimensions
+---@field height integer
 ---@field top_line integer
 ---@field bottom_line integer
 ---@field start_line integer
@@ -64,6 +65,7 @@ local function get_windims()
   local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
 
   return {
+    height = wininfo[1].height,        -- window height
     top_line = wininfo[1].topline,     -- top line of buffer
     bottom_line = wininfo[1].botline,  -- bottom line of buffer
     start_line = wininfo[1].winrow,    -- start row of current tabpage
@@ -158,10 +160,97 @@ local function schedule_generate_blob(extmark, path)
 end
 
 
----@param top_line integer The first line of the currently-displayed window
----@param bottom_line integer The last line of the currently-displayed window
+---@param extmark any Raw extmark object that I don't care to type
+---@param cursor_line integer Current cursor position
+---@param windims window_dimensions Window dimensions
+local function inline_extmark(extmark, cursor_line, windims)
+  local start_row, end_row = extmark[2], extmark[4].end_row
+
+  -- Not on screen
+  if end_row + 1 <= windims.top_line or start_row + 1 > windims.bottom_line then
+    return nil
+  end
+
+  local crop_row_start = math.max(0, windims.top_line - 1 - start_row)
+  local crop_row_end = math.max(0, end_row - windims.bottom_line + 1)
+
+  local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1 or vim.fn.foldclosed(end_row + 1) ~= -1
+  local cursor_in_extmark = start_row <= cursor_line and cursor_line <= end_row
+
+  if
+    (cursor_in_extmark or bad_fold)
+    and ( -- No error exists
+      vim.b.image_extmark_to_error == nil
+      or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
+    )
+  then
+    return nil
+  end
+
+  -- Adjust height by folds and virtual text
+  local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all - 1
+  if crop_row_end == height then return nil end
+
+  return {
+    id = extmark[1],
+    start_row = start_row,
+    end_row = end_row,
+    height = height,
+    crop_row_start = crop_row_start,
+    crop_row_end = crop_row_end,
+  }
+end
+
+
+---@param extmark any Raw extmark object that I don't care to type
+---@param cursor_line integer Current cursor position
+---@param windims window_dimensions Window dimensions
+---@return wrapped_extmark | nil
+local function virt_lines_extmark(extmark, cursor_line, windims)
+  local start_row, raw_height = extmark[2], #extmark[4].virt_lines
+  --
+  -- -- Not on screen
+  -- if start_row + 1 > windims.bottom_line then
+  --   return nil
+  -- end
+  --
+  -- local crop_row_start = math.max(0, windims.top_line - 1 - start_row)
+  --
+  -- local crop_row_end = 0
+  -- if start_row == windims.bottom_line then
+  -- end
+  --
+  -- local crop_row_end = math.max(0, end_row - windims.bottom_line + 1)
+  --
+  -- local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1
+  -- local cursor_in_extmark = start_row <= cursor_line and cursor_line <= end_row
+  --
+  -- if
+  --   (cursor_in_extmark or bad_fold)
+  --   and ( -- No error exists
+  --     vim.b.image_extmark_to_error == nil
+  --     or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
+  --   )
+  -- then
+  --   return nil
+  -- end
+  --
+  -- if crop_row_end == height then return nil end
+  --
+  -- return {
+  --   id = extmark[1],
+  --   start_row = start_row,
+  --   end_row = end_row,
+  --   height = height,
+  --   crop_row_start = crop_row_start,
+  --   crop_row_end = crop_row_end,
+  -- }
+end
+
+
+---@param dims window_dimensions
 ---@return (wrapped_extmark | nil)[]
-function window_drawing.get_visible_extmarks(top_line, bottom_line)
+function window_drawing.get_visible_extmarks(dims)
   local extmarks = vim.api.nvim_buf_get_extmarks(
     0,
     interface.namespace,
@@ -169,42 +258,14 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     -1,
     { details = true }
   )
-  local cursor_row = vim.fn.line(".") - 1
+  local cursor_line = vim.fn.line(".") - 1
 
   return vim.tbl_map(function(extmark)
-    local start_row, end_row = extmark[2], extmark[4].end_row
-
-    if end_row <= top_line or start_row > bottom_line then
-      return nil
+    if extmark[4].virt_lines ~= nil then
+      return virt_lines_extmark(extmark, cursor_line, dims)
+    else
+      return inline_extmark(extmark, cursor_line, dims)
     end
-
-    local crop_row_start = math.max(0, top_line - start_row)
-    local crop_row_end = math.max(0, end_row - bottom_line)
-
-    local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1 or vim.fn.foldclosed(end_row + 1) ~= -1
-    local cursor_in_extmark = start_row <= cursor_row and cursor_row <= end_row
-
-    if
-      (cursor_in_extmark or bad_fold)
-      and (
-        vim.b.image_extmark_to_error == nil
-        or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
-      )
-    then
-      return nil
-    end
-
-    local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all - 1
-    if crop_row_end == height then return nil end
-
-    return {
-      id = extmark[1],
-      start_row = start_row,
-      end_row = end_row,
-      height = height,
-      crop_row_start = crop_row_start,
-      crop_row_end = crop_row_end,
-    }
   end, extmarks)
 end
 
@@ -284,10 +345,7 @@ function window_drawing.extmarks_needing_update(force)
 
   -- Try getting the visible extmarks, since the cache seems valid
   local extmarks = vim.tbl_values(
-    window_drawing.get_visible_extmarks(
-      new_dims.top_line - 1,
-      new_dims.bottom_line - 1
-    )
+    window_drawing.get_visible_extmarks(new_dims)
   )
 
   -- Update cache
