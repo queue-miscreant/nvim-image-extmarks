@@ -21,14 +21,6 @@ local window_drawing = {
 }
 
 
----@class window_dimensions
----@field height integer
----@field top_line integer
----@field bottom_line integer
----@field start_line integer
----@field window_column integer
----@field start_column integer
-
 local function fire_pre_draw(extmarks)
   local errored = pcall(function()
     vim.api.nvim_exec_autocmds("User", {
@@ -60,17 +52,25 @@ function window_drawing.extmark_cache_entry(window_id, extmark)
 end
 
 
+---@class window_dimensions
+---@field height integer
+---@field topline integer Top line of the buffer
+---@field botline integer Bottom line of the buffer
+---@field winrow integer Start row of the current tabpage
+---@field wincol integer Start column of  the current tabpage
+---@field textoff integer Sign/number column offset
+
 ---@return window_dimensions
 local function get_windims()
   local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
 
   return {
-    height = wininfo[1].height,        -- window height
-    top_line = wininfo[1].topline,     -- top line of buffer
-    bottom_line = wininfo[1].botline,  -- bottom line of buffer
-    start_line = wininfo[1].winrow,    -- start row of current tabpage
-    window_column = wininfo[1].wincol, -- start column of current tabpage
-    start_column = wininfo[1].textoff, -- sign/number column offset
+    height = wininfo[1].height,
+    topline = wininfo[1].topline,
+    botline = wininfo[1].botline,
+    winrow = wininfo[1].winrow,
+    wincol = wininfo[1].wincol,
+    textoff = wininfo[1].textoff,
   }
 end
 
@@ -82,10 +82,10 @@ end
 local function window_to_terminal(start_row, windims)
   local row_offset = vim.api.nvim_win_text_height(
     0,
-    { start_row = windims.top_line - 1, end_row = start_row }
+    { start_row = windims.topline - 1, end_row = start_row }
   ).all
-  local row = windims.start_line + row_offset - 1
-  local column = windims.window_column + windims.start_column
+  local row = windims.winrow + row_offset - 1
+  local column = windims.wincol + windims.textoff
 
   return { row, column }
 end
@@ -167,12 +167,12 @@ local function inline_extmark(extmark, cursor_line, windims)
   local start_row, end_row = extmark[2], extmark[4].end_row
 
   -- Not on screen
-  if end_row + 1 <= windims.top_line or start_row + 1 > windims.bottom_line then
+  if end_row + 1 <= windims.topline or start_row + 1 > windims.botline then
     return nil
   end
 
-  local crop_row_start = math.max(0, windims.top_line - 1 - start_row)
-  local crop_row_end = math.max(0, end_row - windims.bottom_line + 1)
+  local crop_row_start = math.max(0, windims.topline - 1 - start_row)
+  local crop_row_end = math.max(0, end_row - windims.botline + 1)
 
   local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1 or vim.fn.foldclosed(end_row + 1) ~= -1
   local cursor_in_extmark = start_row <= cursor_line and cursor_line <= end_row
@@ -210,17 +210,17 @@ local function virt_lines_extmark(extmark, cursor_line, windims)
   local start_row, raw_height = extmark[2], #extmark[4].virt_lines
   --
   -- -- Not on screen
-  -- if start_row + 1 > windims.bottom_line then
+  -- if start_row + 1 > windims.botline then
   --   return nil
   -- end
   --
-  -- local crop_row_start = math.max(0, windims.top_line - 1 - start_row)
+  -- local crop_row_start = math.max(0, windims.topline - 1 - start_row)
   --
   -- local crop_row_end = 0
-  -- if start_row == windims.bottom_line then
+  -- if start_row == windims.botline then
   -- end
   --
-  -- local crop_row_end = math.max(0, end_row - windims.bottom_line + 1)
+  -- local crop_row_end = math.max(0, end_row - windims.botline + 1)
   --
   -- local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1
   -- local cursor_in_extmark = start_row <= cursor_line and cursor_line <= end_row
