@@ -195,6 +195,7 @@ function window_drawing.get_visible_extmarks(top_line, bottom_line)
     end
 
     local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all - 1
+    if crop_row_end == height then return nil end
 
     return {
       id = extmark[1],
