@@ -150,15 +150,13 @@ function sixel_raw.blobify(
 
   local stdout = vim.loop.new_pipe()
   local stderr = vim.loop.new_pipe()
-  vim.loop.spawn("convert", {
+  vim.loop.spawn("magick", {
     args = {
       filepath .. "[0]",
-      "(",
-      "+resize",
+      "-resize",
       resize,
-      "+crop",
+      "-crop",
       crop,
-      ")",
       "sixel:-"
     },
     stdio = {nil, stdout, stderr},
@@ -176,14 +174,14 @@ function sixel_raw.blobify(
     table.insert(sixel, data)
   end)
 
-  local erro = ""
+  local error_ = ""
   stderr:read_start(function(err, data)
     assert(not err, err)
     if data == nil then
       if error_callback ~= nil then error_callback(data) end
       return
     end
-    erro = erro .. "\n" .. data
+    error_ = error_ .. "\n" .. data
   end)
 end
 

@@ -278,5 +278,4 @@ TODOs
 - Images crop to window width
 - Hide text behind extmark with highlight
     - This is more difficult than it seems. 256-color terminals use `gui` highlights, which don't support `start=`/`stop=`
-- Improve display after Ex command with multiline output?
 - Crop thresholds

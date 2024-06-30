@@ -384,6 +384,7 @@ function window_drawing.extmarks_needing_update(force)
     window_drawing.just_enabled = false
   end
 
+  -- TODO: remove line("$")
   local need_clear = force
     or #extmarks > 0 and (
       not vim.deep_equal(new_dims, window_cache) -- Window has moved
