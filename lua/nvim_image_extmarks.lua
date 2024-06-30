@@ -228,7 +228,7 @@ function sixel_extmarks.redraw(force)
   local new_extmarks = {}
   local new_count = 0
 
-  ---@type [integer, global_extmark[]][]
+  ---@type [integer, wrapped_extmark[]][]
   local need_update = vim.tbl_map(function(window)
     return vim.api.nvim_win_call(window, function()
       local extmarks_to_draw, need_clear_window = window_drawing.extmarks_needing_update(
@@ -239,7 +239,7 @@ function sixel_extmarks.redraw(force)
       local lazy_extmarks_to_draw = {}
 
       for _, extmark in pairs(extmarks_to_draw) do
-        local cache_entry = window_drawing.extmark_cache_entry(window, extmark.extmark)
+        local cache_entry = window_drawing.extmark_cache_entry(window, extmark)
         new_extmarks[cache_entry] = true
 
         -- Add to the lazy list if we didn't draw it previously
@@ -249,7 +249,7 @@ function sixel_extmarks.redraw(force)
         end
       end
 
-      ---@type [integer, global_extmark[], global_extmark[]]
+      ---@type [integer, wrapped_extmark[], wrapped_extmark[]]
       return { window, extmarks_to_draw, lazy_extmarks_to_draw }
     end)
   end, windows)

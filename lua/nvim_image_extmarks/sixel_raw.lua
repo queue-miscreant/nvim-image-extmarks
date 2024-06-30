@@ -16,6 +16,7 @@ local ffi = require "ffi"
 ---@field crop_row_start integer
 ---@field crop_row_end integer
 ---@field details extmark_details
+---@field screen_position [integer, integer]
 
 local sixel_raw = {
   tty = nil,
