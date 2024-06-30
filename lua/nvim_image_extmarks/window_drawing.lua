@@ -59,10 +59,12 @@ end
 ---@field winrow integer Start row of the current tabpage
 ---@field wincol integer Start column of  the current tabpage
 ---@field textoff integer Sign/number column offset
+---@field topfill integer Filler (extmark) lines included at the top of the window
 
 ---@return window_dimensions
 local function get_windims()
   local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
+  local saveview = vim.fn.winsaveview()
 
   return {
     height = wininfo[1].height,
@@ -71,6 +73,7 @@ local function get_windims()
     winrow = wininfo[1].winrow,
     wincol = wininfo[1].wincol,
     textoff = wininfo[1].textoff,
+    topfill = saveview.topfill,
   }
 end
 
@@ -80,11 +83,15 @@ end
 ---@param windims window_dimensions The current dimensions of the window
 ---@return [integer, integer]
 local function window_to_terminal(start_row, windims)
-  local row_offset = vim.api.nvim_win_text_height(
-    0,
-    { start_row = windims.topline - 1, end_row = start_row }
-  ).all
-  local row = windims.winrow + row_offset - 1
+  -- default row, for things at the very top of the screen
+  local row = 1
+  if start_row >= windims.topline then
+    local row_offset = vim.api.nvim_win_text_height(
+      0,
+      { start_row = windims.topline, end_row = start_row }
+    ).all
+    row = windims.winrow + windims.topfill + row_offset - 1
+  end
   local column = windims.wincol + windims.textoff
 
   return { row, column }
@@ -188,7 +195,10 @@ local function inline_extmark(extmark, cursor_line, windims)
   end
 
   -- Adjust height by folds and virtual text
-  local height = vim.api.nvim_win_text_height(0, { start_row = start_row, end_row = end_row }).all - 1
+  local height = vim.api.nvim_win_text_height(
+    0,
+    { start_row = start_row, end_row = end_row }
+  ).all - 1
   if crop_row_end == height then return nil end
 
   return {
@@ -203,48 +213,66 @@ end
 
 
 ---@param extmark any Raw extmark object that I don't care to type
----@param cursor_line integer Current cursor position
 ---@param windims window_dimensions Window dimensions
 ---@return wrapped_extmark | nil
-local function virt_lines_extmark(extmark, cursor_line, windims)
-  local start_row, raw_height = extmark[2], #extmark[4].virt_lines
-  --
-  -- -- Not on screen
-  -- if start_row + 1 > windims.botline then
-  --   return nil
-  -- end
-  --
-  -- local crop_row_start = math.max(0, windims.topline - 1 - start_row)
-  --
-  -- local crop_row_end = 0
-  -- if start_row == windims.botline then
-  -- end
-  --
-  -- local crop_row_end = math.max(0, end_row - windims.botline + 1)
-  --
-  -- local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1
-  -- local cursor_in_extmark = start_row <= cursor_line and cursor_line <= end_row
-  --
-  -- if
-  --   (cursor_in_extmark or bad_fold)
-  --   and ( -- No error exists
-  --     vim.b.image_extmark_to_error == nil
-  --     or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
-  --   )
-  -- then
-  --   return nil
-  -- end
-  --
-  -- if crop_row_end == height then return nil end
-  --
-  -- return {
-  --   id = extmark[1],
-  --   start_row = start_row,
-  --   end_row = end_row,
-  --   height = height,
-  --   crop_row_start = crop_row_start,
-  --   crop_row_end = crop_row_end,
-  -- }
+local function virt_lines_extmark(extmark, windims)
+  local start_row, height = extmark[2], #extmark[4].virt_lines
+
+  local crop_row_start = 0
+  local crop_row_end = 0
+
+  -- Not on screen
+  if start_row + 1 < windims.topline - 1 then
+    return nil
+  elseif start_row + 1 == windims.topline - 1 then
+    -- No filler lines from this
+    if windims.topfill == 0 then
+      return nil
+    end
+    -- In very rare circumstances (multiple extmarks on the same line?),
+    -- this won't work, but let's not worry about that
+    crop_row_start = height - windims.topfill
+  -- Extmark at the bottom of the screen
+  elseif start_row + 1 == windims.botline then
+    -- Calculate the lines missing from the bottom
+    local text_height_params = {
+      start_row = windims.topline,
+      end_row = windims.botline,
+    }
+    if windims.botline == vim.fn.line("$") then
+      text_height_params.end_row = nil
+    end
+    local overdraw = vim.api.nvim_win_text_height(
+      0,
+      text_height_params
+    ).all
+
+    crop_row_end = overdraw + windims.topfill - windims.height
+  -- Not on screen
+  elseif start_row + 1 > windims.botline then
+    return nil
+  end
+
+  local bad_fold = vim.fn.foldclosed(start_row + 1) ~= -1
+
+  if
+    bad_fold
+    and ( -- No error exists
+      vim.b.image_extmark_to_error == nil
+      or vim.b.image_extmark_to_error[tostring(extmark[1])] == nil
+    )
+  then
+    return nil
+  end
+  if crop_row_end == height then return nil end
+
+  return {
+    id = extmark[1],
+    start_row = start_row,
+    height = height,
+    crop_row_start = crop_row_start,
+    crop_row_end = crop_row_end,
+  }
 end
 
 
@@ -262,7 +290,7 @@ function window_drawing.get_visible_extmarks(dims)
 
   return vim.tbl_map(function(extmark)
     if extmark[4].virt_lines ~= nil then
-      return virt_lines_extmark(extmark, cursor_line, dims)
+      return virt_lines_extmark(extmark, dims)
     else
       return inline_extmark(extmark, cursor_line, dims)
     end
