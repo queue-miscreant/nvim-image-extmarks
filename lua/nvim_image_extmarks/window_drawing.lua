@@ -363,12 +363,9 @@ end
 ---@param force boolean
 ---@return wrapped_extmark[], boolean
 function window_drawing.extmarks_needing_update(force)
-  -- Get current cache
-  local line_cache = vim.w.vim_image_line_cache
+  -- Get current cached dimensions and newest dimensions
   local window_cache = vim.w.vim_image_window_cache
-
   local new_dims = get_windims()
-  local new_line = vim.fn.line("$")
 
   -- Try getting the visible extmarks, since the cache seems valid
   local extmarks = vim.tbl_values(
@@ -377,19 +374,14 @@ function window_drawing.extmarks_needing_update(force)
 
   -- Update cache
   vim.w.vim_image_window_cache = new_dims
-  vim.w.vim_image_line_cache = new_line
 
   -- TODO: move this outside this function
   if window_drawing.just_enabled then
     window_drawing.just_enabled = false
   end
 
-  -- TODO: remove line("$")
   local need_clear = force
-    or #extmarks > 0 and (
-      not vim.deep_equal(new_dims, window_cache) -- Window has moved
-      or line_cache ~= vim.fn.line("$") -- Lines have been added
-    )
+    or #extmarks > 0 and not vim.deep_equal(new_dims, window_cache) -- Window has moved
 
   return extmarks, need_clear
 end
